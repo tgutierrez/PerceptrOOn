@@ -14,7 +14,7 @@ namespace NeuralNetworkExample
 
         // Weight matrices for connections: input->hidden and hidden->output
         private double[,] weightsInputHidden;
-        private double[,] weightsHiddenOutput;
+         private double[,] weightsHiddenOutput;
 
         // Biases for the hidden and output layers
         private double[] biasHidden;
