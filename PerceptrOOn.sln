@@ -3,9 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35707.178
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplePerceptronFromChatGPT", "SimplePerceptronFromChatGPT\SimplePerceptronFromChatGPT.csproj", "{1B121CD3-CDAF-4AB5-A239-2AD841A77604}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{CE9A8E52-0655-4345-B9A7-2D89A5E48336}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PerceptrOOn", "PerceptrOOn\PerceptrOOn.csproj", "{FF7ECFA9-E185-4643-8034-2BB1EF2D972D}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{C8136E25-DEDB-4514-8A47-9E79A5CF53E7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PerceptrOOn", "src\PerceptrOOn\PerceptrOOn.csproj", "{0F2055CB-F4E7-4F8F-AA9C-8512F4860511}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleHost", "test\ConsoleHost\ConsoleHost.csproj", "{B6111BD7-2D7C-47AE-BE01-467AD535D2D4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "test\Tests\Tests.csproj", "{3C1DE704-A20D-44ED-BFB2-A56552123083}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,16 +19,25 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{1B121CD3-CDAF-4AB5-A239-2AD841A77604}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1B121CD3-CDAF-4AB5-A239-2AD841A77604}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1B121CD3-CDAF-4AB5-A239-2AD841A77604}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1B121CD3-CDAF-4AB5-A239-2AD841A77604}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FF7ECFA9-E185-4643-8034-2BB1EF2D972D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FF7ECFA9-E185-4643-8034-2BB1EF2D972D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FF7ECFA9-E185-4643-8034-2BB1EF2D972D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FF7ECFA9-E185-4643-8034-2BB1EF2D972D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F2055CB-F4E7-4F8F-AA9C-8512F4860511}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F2055CB-F4E7-4F8F-AA9C-8512F4860511}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F2055CB-F4E7-4F8F-AA9C-8512F4860511}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F2055CB-F4E7-4F8F-AA9C-8512F4860511}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B6111BD7-2D7C-47AE-BE01-467AD535D2D4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B6111BD7-2D7C-47AE-BE01-467AD535D2D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B6111BD7-2D7C-47AE-BE01-467AD535D2D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B6111BD7-2D7C-47AE-BE01-467AD535D2D4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C1DE704-A20D-44ED-BFB2-A56552123083}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C1DE704-A20D-44ED-BFB2-A56552123083}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C1DE704-A20D-44ED-BFB2-A56552123083}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C1DE704-A20D-44ED-BFB2-A56552123083}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{0F2055CB-F4E7-4F8F-AA9C-8512F4860511} = {CE9A8E52-0655-4345-B9A7-2D89A5E48336}
+		{B6111BD7-2D7C-47AE-BE01-467AD535D2D4} = {C8136E25-DEDB-4514-8A47-9E79A5CF53E7}
+		{3C1DE704-A20D-44ED-BFB2-A56552123083} = {C8136E25-DEDB-4514-8A47-9E79A5CF53E7}
 	EndGlobalSection
 EndGlobal
