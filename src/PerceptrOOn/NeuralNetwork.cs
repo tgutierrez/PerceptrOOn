@@ -60,9 +60,10 @@ public interface IActivationStrategy
 }
 
 
+public delegate void Notify(int current, int total, string description);
 
 
-public record NetworkDefinition(int InputNodes, int[] HiddenLayerNodeDescription, int OutputNodes, IActivationStrategy ActivationStrategy);
+public record NetworkDefinition(int InputNodes, int[] HiddenLayerNodeDescription, int OutputNodes, IActivationStrategy ActivationStrategy, Notify? NotificationCallback = null);
 public record TrainingData(double[] input, double[] expectedOutput);
 public record TrainingParameters(TrainingData[] TrainingDataSet, int Epochs, double TrainingRate);
 
@@ -105,14 +106,17 @@ public class NeuralNetwork
 {
     private readonly ILayer[] layers;
     private readonly IActivationStrategy activationStrategy;
-
+    
     private InputLayer InputLayer => (layers[0] as InputLayer)!;
     private Layer OutputLayer => (layers[^1] as Layer)!;
     private Layer[] HiddenLayer => layers[1..^1].Cast<Layer>().ToArray()!;
 
+    public NetworkDefinition Definition { get; internal set; }
+
     public NeuralNetwork(NetworkDefinition definition) { 
         this.activationStrategy = definition.ActivationStrategy;
         layers = BuildLayers(definition);
+        this.Definition = definition;
     }
 
     private ILayer[] BuildLayers(NetworkDefinition definition)
@@ -165,8 +169,8 @@ public class NeuralNetwork
         int cnt = 0;
         foreach (var trainingSet in trainingParameters.TrainingDataSet)
         {
-            Console.WriteLine(cnt++);
-            TrainingCycle(trainingSet, epoch, rate);  
+            TrainingCycle(trainingSet, epoch, rate);
+            Definition.NotificationCallback?.Invoke(cnt, trainingParameters.TrainingDataSet.Length, "Performing Cycle");
         }
     }
 

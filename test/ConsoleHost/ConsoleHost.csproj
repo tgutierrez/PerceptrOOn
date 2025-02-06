@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="iluvadev.ConsoleProgressBar" Version="1.1.0" />
     <PackageReference Include="MNIST.IO" Version="1.0.1" />
   </ItemGroup>
 

@@ -1,6 +1,9 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+using iluvadev.ConsoleProgressBar;
 using MNIST.IO;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 
 /*
@@ -12,33 +15,49 @@ var data = FileReaderMNIST.LoadImagesAndLables(
     ).ToList();
 
 
-var mnistNetwork = new NeuralNetwork(new NetworkDefinition(
-       InputNodes: 784,
-       HiddenLayerNodeDescription: [784, 392, 196, 98],
-       OutputNodes: 10,
-       ActivationStrategy: new SigmoidActivationStrategy(5)
-    ));
-
 var trainingDataSet = new List<TrainingData>();
 
 foreach (var node in data[0..1000]) {
     trainingDataSet.Add(new TrainingData(Flatten(node.Image), ByteToFlatOutput(node.Label)));
 }
 
-
-
 var trainingParameters = new TrainingParameters(
         TrainingDataSet: trainingDataSet.ToArray(),
-        Epochs: 1,
-        TrainingRate: 1
+        Epochs: 60,
+        TrainingRate: 0.128
     );
 
+TrainingData set;
+double[] output;
 
-mnistNetwork.Train(trainingParameters);
+using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParameters.Epochs, FixedInBottom=false })
+{
+    var mnistNetwork = new NeuralNetwork(new NetworkDefinition(
+       InputNodes: 784,
+       HiddenLayerNodeDescription: [784],
+       OutputNodes: 10,
+       ActivationStrategy: new SigmoidActivationStrategy(seed: 1337),
+       NotificationCallback: (current, total, description) => { pb.PerformStep(description); }
+    ));
 
-var output = mnistNetwork.Predict(trainingDataSet[10].input);
+    var watch = Stopwatch.StartNew();
+    mnistNetwork.Train(trainingParameters);
+    watch.Stop();
+    pb.WriteLine($"Training Completed on: {watch.ElapsedMilliseconds}ms");
 
-Console.WriteLine($"Output : [{String.Join(",", output.Select(o => o.ToString("n")))}]");
+    // Pick random element
+    var rnd = new Random();
+
+    set = trainingDataSet[rnd.Next(trainingDataSet.Count)];
+
+    output = mnistNetwork.Predict(set.input);
+}
+
+Console.WriteLine($"Predicting: [{String.Join(",", set.expectedOutput.Select(o => o.ToString("n")))}]");
+Console.WriteLine($"Output    : [{String.Join(",", output.Select(o => o.ToString("n")))}]");
+Console.WriteLine("Press any key to exit");
+Console.ReadLine();
+
 
 double[] ByteToFlatOutput(byte label)
 {
@@ -58,5 +77,3 @@ double[] Flatten(byte[,] image)
 }
 
 double NormalizeByte(byte input) => input / 255;
-
-Console.ReadLine();
