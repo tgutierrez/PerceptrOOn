@@ -169,11 +169,10 @@ public class NeuralNetwork
     }
 
     private void TrainingEpoch(TrainingParameters trainingParameters, int epoch, double rate) {
-        int cnt = 0;
         foreach (var trainingSet in trainingParameters.TrainingDataSet)
         {
             TrainingCycle(trainingSet, epoch, rate);
-            Definition.NotificationCallback?.Invoke(cnt, trainingParameters.TrainingDataSet.Length, "Performing Cycle");
+            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Training Epoch {epoch+1}");
         }
     }
 
@@ -189,7 +188,6 @@ public class NeuralNetwork
 
         // 3 - Feed the errors to the output layer and start the process
         this.OutputLayer.BackPropagate(outputErrors, rate  );
-
     }
 }
 

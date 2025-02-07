@@ -20,12 +20,12 @@ data = data.Where(z => labels.Any(l => l == z.Label)).ToList();
 var trainingDataSet = new List<TrainingData>();
 
 foreach (var node in data) {
-    trainingDataSet.Add(new TrainingData(Flatten(node.Image), ByteToFlatOutput(node.Label)));
+    trainingDataSet.Add(new TrainingData(Flatten(node.Image), ByteToFlatOutput(node.Label, labels.Length)));
 }
 
 var trainingParameters = new TrainingParameters(
         TrainingDataSet: trainingDataSet.ToArray(),
-        Epochs: 1,
+        Epochs: 3,
         TrainingRate: 0.05
     );
 
@@ -61,9 +61,9 @@ Console.WriteLine("Press any key to exit");
 Console.ReadLine();
 
 
-double[] ByteToFlatOutput(byte label)
+double[] ByteToFlatOutput(byte label, int outputSize)
 {
-    double[] output = new double[4];
+    double[] output = new double[outputSize];
     output[label] = 1;
     return output;
 }
