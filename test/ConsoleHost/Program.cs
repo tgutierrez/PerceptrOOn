@@ -14,17 +14,19 @@ var data = FileReaderMNIST.LoadImagesAndLables(
         , @"Assets\train-images-idx3-ubyte.gz"
     ).ToList();
 
+var labels = new byte[] { 0, 1, 2, 3 };
+data = data.Where(z => labels.Any(l => l == z.Label)).ToList();
 
 var trainingDataSet = new List<TrainingData>();
 
-foreach (var node in data[0..1000]) {
+foreach (var node in data) {
     trainingDataSet.Add(new TrainingData(Flatten(node.Image), ByteToFlatOutput(node.Label)));
 }
 
 var trainingParameters = new TrainingParameters(
         TrainingDataSet: trainingDataSet.ToArray(),
-        Epochs: 60,
-        TrainingRate: 0.128
+        Epochs: 1,
+        TrainingRate: 0.05
     );
 
 TrainingData set;
@@ -34,8 +36,8 @@ using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParame
 {
     var mnistNetwork = new NeuralNetwork(new NetworkDefinition(
        InputNodes: 784,
-       HiddenLayerNodeDescription: [784],
-       OutputNodes: 10,
+       HiddenLayerNodeDescription: [64],
+       OutputNodes: labels.Length, // Size of the label set will dictate the length
        ActivationStrategy: new SigmoidActivationStrategy(seed: 1337),
        NotificationCallback: (current, total, description) => { pb.PerformStep(description); }
     ));
@@ -61,7 +63,7 @@ Console.ReadLine();
 
 double[] ByteToFlatOutput(byte label)
 {
-    double[] output = new double[10];
+    double[] output = new double[4];
     output[label] = 1;
     return output;
 }
@@ -76,4 +78,4 @@ double[] Flatten(byte[,] image)
     return flat.ToArray();
 }
 
-double NormalizeByte(byte input) => input / 255;
+double NormalizeByte(byte input) => input / 255d;

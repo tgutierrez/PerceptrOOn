@@ -1,5 +1,4 @@
-﻿
-#region Base Definitions
+﻿#region Base Definitions
 
 public interface ILayer {
     int Id { get; }
@@ -125,11 +124,15 @@ public class NeuralNetwork
 
         ILayer previousLayer = new InputLayer(definition.InputNodes);
         layerList.Add(previousLayer);
-        foreach (var index in Enumerable.Range(1, definition.HiddenLayerNodeDescription.Length -1)) { 
-            var newHiddenLayer = new HiddenLayer(previousLayer, definition.HiddenLayerNodeDescription[index], this.activationStrategy);
+
+        int layerIndex = 1;
+        foreach (var description in definition.HiddenLayerNodeDescription) {
+            var newHiddenLayer = new HiddenLayer(previousLayer, description, this.activationStrategy);
             layerList.Add(newHiddenLayer);
             previousLayer = newHiddenLayer;
+            layerIndex++;
         }
+
         layerList.Add(new OutputLayer(previousLayer, definition.OutputNodes, activationStrategy));
 
         return layerList.ToArray();
@@ -284,7 +287,7 @@ public class HiddenLayer : Layer
     public override void BackPropagate(IBackPropagationInput[] gradients, double rate) 
     {
         var hiddenGradients = new List<IBackPropagationInput>();
-        var currentErrors = new double[this.Neurons.Length];
+
         // Calculate errors from Previous layer
         foreach (var neuron in this.Neurons)
         {
