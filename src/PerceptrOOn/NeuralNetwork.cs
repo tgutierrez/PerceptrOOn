@@ -58,6 +58,7 @@ public class Weight
 
 public interface IActivationStrategy
 {
+    string Name { get; }
     double ComputeActivation(double input);
     double ComputeActivationDerivative (double input);
     double GetRandomWeight();
@@ -65,12 +66,13 @@ public interface IActivationStrategy
 
 public interface INetworkExporter<T>
 {
-    public T Export(ILayer[] layer);
+    public T Export(ILayer[] layer, IActivationStrategy activationStrategy);
 }
 
 public interface INetworkImporter<T> 
 {
-    public ILayer[] Import(T networkData);
+    public ILayer[] Import(T networkData, Func<IActivationStrategy>? activationStrategyFactory);
+
 }
 
 public delegate void Notify(int current, int total, string description);
@@ -96,15 +98,31 @@ public interface IBackPropagationInput {
 
 #region Activation strategies
 
-public class SigmoidActivationStrategy(int seed) : IActivationStrategy
+public class SigmoidActivationStrategy : IActivationStrategy
 {
-    private Random rand = new(seed);
+    private Random rand; 
+
+    public SigmoidActivationStrategy(int? seed = default) {
+        rand = seed.HasValue ? new Random(seed.Value) : new Random();
+    }
+    public string Name => "Sigmoid";
 
     public double ComputeActivation(double x) => 1.0 / (1.0 + Math.Exp(-x));
 
     public double ComputeActivationDerivative (double x) => x * (1 - x);
 
     public double GetRandomWeight() => rand.NextDouble() *2 -1;
+}
+
+
+public static class ActivationStrategyFactory {
+
+    public static IActivationStrategy Create(string name, int? seed = default)
+        => name switch
+        {
+            "Sigmoid" => new SigmoidActivationStrategy(seed),
+            _ => throw new NotImplementedException()
+        };
 }
 
 #endregion
@@ -224,10 +242,10 @@ public class NeuralNetwork
     }
 
     public T ExportWith<E, T>() where E : INetworkExporter<T>, new()
-        => new E().Export(layers);
+        => new E().Export(layers, activationStrategy);
 
 
-    public T Export<T>(INetworkExporter<T> exporter) => exporter.Export(layers);
+    public T Export<T>(INetworkExporter<T> exporter) => exporter.Export(layers, activationStrategy);
 }
 
 /// <summary>
