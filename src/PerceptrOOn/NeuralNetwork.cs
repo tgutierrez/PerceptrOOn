@@ -1,5 +1,10 @@
 ﻿#region Base Definitions
 
+using Microsoft.VisualBasic;
+using System.Collections.Immutable;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 public interface ILayer {
     int Id { get; }
     int Size { get; }
@@ -58,6 +63,15 @@ public interface IActivationStrategy
     double GetRandomWeight();
 }
 
+public interface INetworkExporter<T>
+{
+    public T Export(ILayer[] layer);
+}
+
+public interface INetworkImporter<T> 
+{
+    public ILayer[] Import(T networkData);
+}
 
 public delegate void Notify(int current, int total, string description);
 
@@ -75,6 +89,7 @@ public interface IBackPropagationInput {
     INode Node { get; }
 
     void AdjustWeights();
+
 }
 
 
@@ -112,10 +127,28 @@ public class NeuralNetwork
 
     public NetworkDefinition Definition { get; internal set; }
 
+    /// <summary>
+    /// Builds the network using definitions
+    /// </summary>
+    /// <param name="definition"></param>
     public NeuralNetwork(NetworkDefinition definition) { 
         this.activationStrategy = definition.ActivationStrategy;
         layers = BuildLayers(definition);
         this.Definition = definition;
+    }
+
+    /// <summary>
+    /// Builds the network using imported layers
+    /// </summary>
+    /// <param name="layers"></param>
+    /// <param name="activationStrategy"></param>
+    /// <exception cref="NotImplementedException"></exception>
+    public NeuralNetwork(ILayer[] layers, IActivationStrategy activationStrategy) { 
+        this.layers = layers;
+        this.activationStrategy = activationStrategy;
+        var hiddenDefinitions = HiddenLayer.ToList().Select(h => h.Neurons.Length).ToArray();
+        this.Definition = new NetworkDefinition(InputLayer.Size, hiddenDefinitions, this.OutputLayer.Size, activationStrategy); // infer definition based on the layer structure
+        // TODO: Validate input
     }
 
     private ILayer[] BuildLayers(NetworkDefinition definition)
@@ -189,6 +222,12 @@ public class NeuralNetwork
         // 3 - Feed the errors to the output layer and start the process
         this.OutputLayer.BackPropagate(outputErrors, rate  );
     }
+
+    public T ExportWith<E, T>() where E : INetworkExporter<T>, new()
+        => new E().Export(layers);
+
+
+    public T Export<T>(INetworkExporter<T> exporter) => exporter.Export(layers);
 }
 
 /// <summary>
@@ -213,7 +252,12 @@ public class InputLayer : ILayer
             inputNodes[index] = new InputNode(index);
         }
     }
-    
+
+    public InputLayer(InputNode[] inputNodes) 
+    { 
+        this.numberOfParameters += inputNodes.Length;
+        this.inputNodes = inputNodes;
+    }
 
     public InputNode[] InputNodes { 
         get => inputNodes;
@@ -254,6 +298,15 @@ public abstract class Layer : ILayer
         }
     }
 
+    public Layer(Neuron[] neurons, IActivationStrategy activationStrategy, ILayer inputLayer, int id)
+    {
+        this.neurons = neurons;
+        this.activationStrategy = activationStrategy;
+        InputLayer = inputLayer;
+        Id = id;
+        Size = this.neurons.Length;
+    }
+
     public ILayer InputLayer { get; init; }
 
     public Neuron[] Neurons 
@@ -281,7 +334,7 @@ public abstract class Layer : ILayer
 public class HiddenLayer : Layer
 {
     public HiddenLayer(ILayer inputLayer, int size, IActivationStrategy activationStrategy) : base(inputLayer, size, activationStrategy) { }
-
+    public HiddenLayer(Neuron[] neurons, IActivationStrategy activationStrategy, ILayer inputLayer, int id)  : base(neurons, activationStrategy, inputLayer, id) { }
     public override void BackPropagate(IBackPropagationInput[] gradients, double rate) 
     {
         var hiddenGradients = new List<IBackPropagationInput>();
@@ -308,7 +361,7 @@ public class HiddenLayer : Layer
 public class OutputLayer : Layer 
 {
     public OutputLayer(ILayer inputLayer, int size, IActivationStrategy activationStrategy) : base(inputLayer, size, activationStrategy) { }
-
+    public OutputLayer(Neuron[] neurons, IActivationStrategy activationStrategy, ILayer inputLayer, int id) : base(neurons, activationStrategy, inputLayer, id) { }
     public override void BackPropagate(IBackPropagationInput[] backPropagationInput, double rate) 
     {
         var gradients = new List<IBackPropagationInput>();
@@ -363,6 +416,16 @@ public class Neuron: INode
         InitializeWeights();
 
         Bias = activationStrategy.GetRandomWeight();
+    }
+
+    public Neuron(IActivationStrategy actions, List<Weight> inputWeights, List<Weight> outputWeights, double bias, ILayer inputLayer, int id)
+    {
+        this.actions = actions;
+        InputWeights = inputWeights;
+        OutputWeights = outputWeights;
+        Bias = bias;
+        InputLayer = inputLayer;
+        Id = id;
     }
 
     private void InitializeWeights()
@@ -429,3 +492,5 @@ public class GradientAdjustment(Neuron Neuron, double Gradient) : IBackPropagati
 }
 
 #endregion
+
+

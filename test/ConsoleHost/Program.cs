@@ -2,8 +2,10 @@
 
 using iluvadev.ConsoleProgressBar;
 using MNIST.IO;
+using PerceptrOOn.Exporters;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 
 /*
@@ -42,10 +44,7 @@ using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParame
        NotificationCallback: (current, total, description) => { pb.PerformStep(description); }
     ));
 
-    var watch = Stopwatch.StartNew();
     mnistNetwork.Train(trainingParameters);
-    watch.Stop();
-    pb.WriteLine($"Training Completed on: {watch.ElapsedMilliseconds}ms");
 
     // Pick random element
     var rnd = new Random();
@@ -53,12 +52,16 @@ using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParame
     set = trainingDataSet[rnd.Next(trainingDataSet.Count)];
 
     output = mnistNetwork.Predict(set.input);
+
+    File.WriteAllText("weights.json", mnistNetwork.ExportWith<JSONExporter, string>());
 }
 
 Console.WriteLine($"Predicting: [{String.Join(",", set.expectedOutput.Select(o => o.ToString("n")))}]");
 Console.WriteLine($"Output    : [{String.Join(",", output.Select(o => o.ToString("n")))}]");
 Console.WriteLine("Press any key to exit");
 Console.ReadLine();
+
+
 
 
 double[] ByteToFlatOutput(byte label, int outputSize)

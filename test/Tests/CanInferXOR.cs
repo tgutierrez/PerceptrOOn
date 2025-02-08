@@ -34,9 +34,8 @@
 
             var output = xorNetwork.Predict(input);
 
-            Array.ForEach(output, Console.WriteLine);
-
             // TODO: Asserts
+            Assert.That(output, Is.EqualTo(new double[] { 0.98701988175004707d }));
         }
     }
 }

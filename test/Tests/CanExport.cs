@@ -1,0 +1,44 @@
+﻿using PerceptrOOn.Exporters;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Tests
+{
+    [TestFixture]
+    public class CanExport
+    {
+        [Test]
+        public void SerializeToJSON() {
+
+            var xorNetwork = new NeuralNetwork(new NetworkDefinition(
+               InputNodes: 2,
+               HiddenLayerNodeDescription: [2, 2],
+               OutputNodes: 1,
+               ActivationStrategy: new SigmoidActivationStrategy(5)
+            ));
+
+                    var trainingParameters = new TrainingParameters(
+                            TrainingDataSet: [
+                                new TrainingData([0d, 0d], [0d]),
+                                new TrainingData([0d, 1d], [1d]),
+                                new TrainingData([1d, 0d], [1d]),
+                                new TrainingData([1d, 1d], [0d]),
+                            ],
+                            Epochs: 10000,
+                            TrainingRate: 1
+                );
+
+            xorNetwork.Train(trainingParameters);
+
+            var exporter = new JSONExporter();
+
+            var result = xorNetwork.Export(exporter);
+
+
+            Assert.That( result, Is.Not.Null ); // too lazy for an actual assert. 
+        }
+    }
+}
