@@ -1,6 +1,7 @@
 ﻿#region Base Definitions
 
 using Microsoft.VisualBasic;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,7 +11,7 @@ public interface ILayer {
     int Size { get; }
     INode[] Content {  get; }
 
-    void BackPropagate(IBackPropagationInput[] backPropagationInput, double rate);
+    Task BackPropagate(IBackPropagationInput[] backPropagationInput, double rate);
 }
 
 public interface INode
@@ -211,23 +212,23 @@ public class NeuralNetwork
     /// Train the network using backpropagation
     /// </summary>
     /// <param name="trainingParameters">Parameters</param>
-    public void Train(TrainingParameters trainingParameters)
+    public async Task Train(TrainingParameters trainingParameters)
     {
         foreach (var epoch in Enumerable.Range(0, trainingParameters.Epochs))
         {
-            TrainingEpoch(trainingParameters, epoch, trainingParameters.TrainingRate);
+            await TrainingEpoch(trainingParameters, epoch, trainingParameters.TrainingRate);
         }      
     }
 
-    private void TrainingEpoch(TrainingParameters trainingParameters, int epoch, double rate) {
+    private async Task TrainingEpoch(TrainingParameters trainingParameters, int epoch, double rate) {
         foreach (var trainingSet in trainingParameters.TrainingDataSet)
         {
-            TrainingCycle(trainingSet, epoch, rate);
+            await TrainingCycle(trainingSet, epoch, rate);
             Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Training Epoch {epoch+1}");
         }
     }
 
-    private void TrainingCycle(TrainingData trainingSet, int epoch, double rate)
+    private async Task TrainingCycle(TrainingData trainingSet, int epoch, double rate)
     {
         // 1 - Compute
         this.Predict(trainingSet.input);
@@ -238,7 +239,7 @@ public class NeuralNetwork
                         .Select((e) => new OutputErrorAdjustment(e.Item, trainingSet.expectedOutput[e.Index] - e.Item.Value)).ToArray();
 
         // 3 - Feed the errors to the output layer and start the process
-        this.OutputLayer.BackPropagate(outputErrors, rate  );
+        await this.OutputLayer.BackPropagate(outputErrors, rate);
     }
 
     public T ExportWith<E, T>() where E : INetworkExporter<T>, new()
@@ -291,7 +292,7 @@ public class InputLayer : ILayer
         }
     }
 
-    public void BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient) { /*No-Op, nothing to backpropagate*/ }
+    public Task BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient) => Task.CompletedTask;
 }
 
 /// <summary>
@@ -345,7 +346,7 @@ public abstract class Layer : ILayer
     public double[] CollectOutput() =>
         neurons.Select(w => w.Value).ToArray();
 
-    public abstract void BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient);
+    public abstract Task BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient);
     
 }
 
@@ -353,25 +354,26 @@ public class HiddenLayer : Layer
 {
     public HiddenLayer(ILayer inputLayer, int size, IActivationStrategy activationStrategy) : base(inputLayer, size, activationStrategy) { }
     public HiddenLayer(Neuron[] neurons, IActivationStrategy activationStrategy, ILayer inputLayer, int id)  : base(neurons, activationStrategy, inputLayer, id) { }
-    public override void BackPropagate(IBackPropagationInput[] gradients, double rate) 
+    public override async Task BackPropagate(IBackPropagationInput[] gradients, double rate) 
     {
-        var hiddenGradients = new List<IBackPropagationInput>();
-
-        // Calculate errors from Previous layer
-        foreach (var neuron in this.Neurons)
+        var hiddenGradients = new ConcurrentBag<Tuple<int, GradientAdjustment>>();
+        var neurons = this.Neurons; 
+        Parallel.ForEach(Enumerable.Range(0, neurons.Length),(i) =>    // Use the input length to create parallel tasks 
         {
+            var neuron = neurons[i];
+
             double error = 0;
             foreach (var outputWeight in neuron.OutputWeights)
             {
                 error += gradients[outputWeight.LinksTo.Id].Value * outputWeight.Value;
             }
-            
-            var hiddenGradient = new GradientAdjustment(neuron, error*activationStrategy.ComputeActivationDerivative(neuron.Value)*rate);
-            hiddenGradient.AdjustWeights();
-            hiddenGradients.Add(hiddenGradient);
-        }
 
-        this.InputLayer.BackPropagate(hiddenGradients.ToArray(), rate);
+            var hiddenGradient = new GradientAdjustment(neuron, error * activationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
+            hiddenGradient.AdjustWeights();
+            hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
+        });
+
+        await this.InputLayer.BackPropagate(hiddenGradients.OrderBy(t => t.Item1).Select(v => v.Item2).ToArray(), rate); // Ensure results are ordered, since gradients were calculated in parallel.
     }
 }
 
@@ -380,7 +382,7 @@ public class OutputLayer : Layer
 {
     public OutputLayer(ILayer inputLayer, int size, IActivationStrategy activationStrategy) : base(inputLayer, size, activationStrategy) { }
     public OutputLayer(Neuron[] neurons, IActivationStrategy activationStrategy, ILayer inputLayer, int id) : base(neurons, activationStrategy, inputLayer, id) { }
-    public override void BackPropagate(IBackPropagationInput[] backPropagationInput, double rate) 
+    public override async Task BackPropagate(IBackPropagationInput[] backPropagationInput, double rate) 
     {
         var gradients = new List<IBackPropagationInput>();
         foreach (OutputErrorAdjustment input in backPropagationInput)
@@ -391,7 +393,7 @@ public class OutputLayer : Layer
         }
 
         // Backpropagate
-        this.InputLayer.BackPropagate(gradients.ToArray(), rate);
+        await this.InputLayer.BackPropagate(gradients.ToArray(), rate);
     }
 }
 

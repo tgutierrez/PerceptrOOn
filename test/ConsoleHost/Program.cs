@@ -33,7 +33,7 @@ var trainingParameters = new TrainingParameters(
 
 TrainingData set;
 double[] output;
-
+var watch = new Stopwatch();
 using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParameters.Epochs, FixedInBottom=false })
 {
     var mnistNetwork = new NeuralNetwork(new NetworkDefinition(
@@ -43,9 +43,10 @@ using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParame
        ActivationStrategy: new SigmoidActivationStrategy(seed: 1337),
        NotificationCallback: (current, total, description) => { pb.PerformStep(description); }
     ));
-
-    mnistNetwork.Train(trainingParameters);
-
+    
+    watch.Start(); 
+    await mnistNetwork.Train(trainingParameters);
+    watch.Stop();
     // Pick random element
     var rnd = new Random();
 
@@ -56,9 +57,10 @@ using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParame
     File.WriteAllText("weights.json", mnistNetwork.ExportWith<JSONExporter, string>());
 }
 
-Console.WriteLine($"Predicting: [{String.Join(",", set.expectedOutput.Select(o => o.ToString("n")))}]");
-Console.WriteLine($"Output    : [{String.Join(",", output.Select(o => o.ToString("n")))}]");
-Console.WriteLine("Press any key to exit");
+Console.WriteLine($"Completed on: {watch.ElapsedMilliseconds}ms");
+Console.WriteLine($"Predicting  : [{String.Join(",", set.expectedOutput.Select(o => o.ToString("n")))}]");
+Console.WriteLine($"Output      : [{String.Join(",", output.Select(o => o.ToString("n")))}]");
+Console.WriteLine("Press any key to exit...");
 Console.ReadLine();
 
 
