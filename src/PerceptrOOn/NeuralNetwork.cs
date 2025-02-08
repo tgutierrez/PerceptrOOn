@@ -95,8 +95,6 @@ public interface IBackPropagationInput {
 
 }
 
-
-
 #region Activation strategies
 
 public class SigmoidActivationStrategy : IActivationStrategy
@@ -357,22 +355,22 @@ public class HiddenLayer : Layer
     public override async Task BackPropagate(IBackPropagationInput[] gradients, double rate) 
     {
         var hiddenGradients = new ConcurrentBag<Tuple<int, GradientAdjustment>>();
-        var neurons = this.Neurons; 
-        Parallel.ForEach(Enumerable.Range(0, neurons.Length),(i) =>    // Use the input length to create parallel tasks 
-        {
-            var neuron = neurons[i];
+        var neurons = this.Neurons;
 
-            double error = 0;
-            foreach (var outputWeight in neuron.OutputWeights)
+            Parallel.ForEach(Enumerable.Range(0, neurons.Length), (i) =>    // Use the input length to create parallel tasks 
             {
-                error += gradients[outputWeight.LinksTo.Id].Value * outputWeight.Value;
-            }
+                var neuron = neurons[i];
 
-            var hiddenGradient = new GradientAdjustment(neuron, error * activationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
-            hiddenGradient.AdjustWeights();
-            hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
-        });
+                double error = 0;
+                foreach (var outputWeight in neuron.OutputWeights)
+                {
+                    error += gradients[outputWeight.LinksTo.Id].Value * outputWeight.Value;
+                }
 
+                var hiddenGradient = new GradientAdjustment(neuron, error * activationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
+                hiddenGradient.AdjustWeights();
+                hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
+            });
         await this.InputLayer.BackPropagate(hiddenGradients.OrderBy(t => t.Item1).Select(v => v.Item2).ToArray(), rate); // Ensure results are ordered, since gradients were calculated in parallel.
     }
 }
@@ -456,7 +454,7 @@ public class Neuron: INode
         }
     }
 
-    public void ComputeValue() => this.Value = actions.ComputeActivation(InputWeights.Sum(x => x.Compute()) + Bias);
+    public void ComputeValue() => this.Value = actions.ComputeActivation(InputWeights.Select(x => x.Compute()).Sum() + Bias);
 
     public List<Weight> InputWeights { get; private set; }
 

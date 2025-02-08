@@ -12,7 +12,7 @@ namespace PerceptrOOn.Exporters
 {
     public class JSONImporter : INetworkImporter<string>
     {
-        public ILayer[] Import(string networkData, Func<IActivationStrategy>? activationStrategyFactory)
+        public ILayer[] Import(string networkData, Func<IActivationStrategy>? activationStrategyFactory = default)
         {
             var exportableNetwork = JsonSerializer.Deserialize(networkData, SourceGenerationContext.Default.ExportableNetwork) ?? throw new InvalidOperationException("Network cannot be serialized");
 
@@ -92,6 +92,8 @@ namespace PerceptrOOn.Exporters
             
             return current;
         }
+
+        public TrainingData[] ImportTrainingData(string json) => JsonSerializer.Deserialize(json, SourceGenerationContext.Default.TrainingDataArray);
     }
 
 }

@@ -70,6 +70,8 @@ namespace PerceptrOOn.Exporters
         {
             throw new NotImplementedException();
         }
+
+        public string ExportTrainingData(TrainingData[] trainingData) => JsonSerializer.Serialize(trainingData, SourceGenerationContext.Default.TrainingDataArray);
     }
 
 
@@ -86,6 +88,8 @@ namespace PerceptrOOn.Exporters
     [JsonSerializable(typeof(ExportableLayer))]
     [JsonSerializable(typeof(ExportableNode))]
     [JsonSerializable(typeof(ExportableWeight))]
+    [JsonSerializable(typeof(TrainingParameters))]
+    [JsonSerializable(typeof(TrainingData))]
     internal partial class SourceGenerationContext : JsonSerializerContext
     {
     }
