@@ -75,8 +75,8 @@ namespace PerceptrOOn.Exporters
 
         private static Neuron CreateNeuron(ILayer previousLayer, IActivationStrategy activationStrategy, ExportableNode exportableNode)
         {
-            var inputWeights = new List<Weight>();
-            var outputWeights = new List<Weight>();
+            var inputWeights = new MutableArray<Weight>();
+            var outputWeights = new MutableArray<Weight>();
             var current = new Neuron(activationStrategy,
                                                         inputWeights,  //n.Weights.Select(p => CreateWeight(n, p, previousLayer)).ToList(),
                                                         outputWeights,
@@ -85,10 +85,10 @@ namespace PerceptrOOn.Exporters
                                                         exportableNode.NodeId
                                                         );
             // wire up current weights
-            inputWeights.AddRange(exportableNode.Weights.Select(w => { 
+           exportableNode.Weights.Select(w => { 
                 var weight = new Weight(previousLayer.Content[w.FromNodeId], current, w.Value); 
                 return weight;
-            }).ToList());
+            }).ToList().ForEach(inputWeights.Add);
             
             return current;
         }

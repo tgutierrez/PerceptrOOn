@@ -433,11 +433,11 @@ public class Neuron: INode
         Bias = activationStrategy.GetRandomWeight();
     }
 
-    public Neuron(IActivationStrategy actions, List<Weight> inputWeights, List<Weight> outputWeights, double bias, ILayer inputLayer, int id)
+    public Neuron(IActivationStrategy actions, MutableArray<Weight> inputWeights, MutableArray<Weight> outputWeights, double bias, ILayer inputLayer, int id)
     {
         this.actions = actions;
-        InputWeights = inputWeights.ToArray();
-        OutputWeights = outputWeights.ToArray();
+        InputWeights = inputWeights;
+        OutputWeights = outputWeights;
         Bias = bias;
         InputLayer = inputLayer;
         Id = id;
