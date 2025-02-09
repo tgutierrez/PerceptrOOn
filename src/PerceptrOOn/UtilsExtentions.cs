@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -44,7 +45,7 @@ namespace PerceptrOOn
         /// <param name="array"></param>
         /// <returns></returns>
         public static double Fast_Sum(this double[] array) =>
-            Sse.IsSupported ? array.SumSse() :              
+            Vector.IsHardwareAccelerated ? array.SumSse() :              
             array.Sum();
     }
 }
