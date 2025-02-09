@@ -18,8 +18,9 @@ var data = FileReaderMNIST.LoadImagesAndLables(
         , @"Assets\train-images-idx3-ubyte.gz"
     ).ToList();
 
-//var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-var labels = new byte[] { 0, 1, 2, 3 };
+// var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // Uncomment to train full. Warning, 30 epochs, on a Ryzen7700 takes +/- 15m
+
+var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
 data = data.Where(z => labels.Any(l => l == z.Label)).ToList();
 
 var trainingDataSet = new List<TrainingData>();
@@ -31,7 +32,7 @@ foreach (var node in data) {
 var trainingParameters = new TrainingParameters(
         TrainingDataSet: trainingDataSet.ToArray(),
         Epochs: 3,
-        TrainingRate: 0.05
+        TrainingRate: 0.01
     );
 
 TrainingData set;
@@ -42,7 +43,7 @@ using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParame
 {
     var mnistNetwork = new NeuralNetwork(new NetworkDefinition(
        InputNodes: 784,
-       HiddenLayerNodeDescription: [64],
+       HiddenLayerNodeDescription: [128],
        OutputNodes: labels.Length, // Size of the label set will dictate the length
        ActivationStrategy: new SigmoidActivationStrategy(seed: 1337),
        NotificationCallback: (current, total, description) => { pb.PerformStep(description); }

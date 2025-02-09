@@ -1,11 +1,13 @@
 ﻿#region Base Definitions
 
+using HPCsharp;
+using HPCsharp.ParallelAlgorithms;
 using Microsoft.VisualBasic;
+using PerceptrOOn;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-
 public interface ILayer {
     int Id { get; }
     int Size { get; }
@@ -357,20 +359,17 @@ public class HiddenLayer : Layer
         var hiddenGradients = new ConcurrentBag<Tuple<int, GradientAdjustment>>();
         var neurons = this.Neurons;
 
-            Parallel.ForEach(Enumerable.Range(0, neurons.Length), (i) =>    // Use the input length to create parallel tasks 
-            {
-                var neuron = neurons[i];
+        Parallel.ForEach(Enumerable.Range(0, neurons.Length), (i) =>    // Use the input length to create parallel tasks 
+        {
+            var neuron = neurons[i];
 
-                double error = 0;
-                foreach (var outputWeight in neuron.OutputWeights)
-                {
-                    error += gradients[outputWeight.LinksTo.Id].Value * outputWeight.Value;
-                }
+            double error = neuron.OutputWeights.Select(k => gradients[k.LinksTo.Id].Value * k.Value).ToArray().Fast_Sum();
 
-                var hiddenGradient = new GradientAdjustment(neuron, error * activationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
-                hiddenGradient.AdjustWeights();
-                hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
-            });
+            var hiddenGradient = new GradientAdjustment(neuron, error * activationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
+            hiddenGradient.AdjustWeights();
+            hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
+        });
+
         await this.InputLayer.BackPropagate(hiddenGradients.OrderBy(t => t.Item1).Select(v => v.Item2).ToArray(), rate); // Ensure results are ordered, since gradients were calculated in parallel.
     }
 }
@@ -454,7 +453,7 @@ public class Neuron: INode
         }
     }
 
-    public void ComputeValue() => this.Value = actions.ComputeActivation(InputWeights.Select(x => x.Compute()).Sum() + Bias);
+    public void ComputeValue() => this.Value = actions.ComputeActivation(InputWeights.Select(x => x.Compute()).ToArray().Fast_Sum() + Bias);
 
     public List<Weight> InputWeights { get; private set; }
 
