@@ -23,9 +23,9 @@ public interface INode
 
     public void ComputeValue();
 
-    public List<Weight> OutputWeights { get; }
+    public MutableArray<Weight> OutputWeights { get; }
 
-    public List<Weight> InputWeights { get; }
+    public MutableArray<Weight> InputWeights { get; }
 
 }
 
@@ -338,9 +338,7 @@ public abstract class Layer : ILayer
     public INode[] Content => Neurons;
 
     public void Compute() {
-        foreach (var neuron in neurons) {
-            neuron.ComputeValue();
-        }
+        Parallel.ForEach(neurons, (neuron) => { neuron.ComputeValue(); });
     }
 
     public double[] CollectOutput() =>
@@ -403,9 +401,9 @@ public class InputNode(int id) : INode
     public int Id => id;
     public double Value { get; private set; }
 
-    public List<Weight> OutputWeights { get; private set; } = new List<Weight>();
+    public MutableArray<Weight> OutputWeights { get; private set; } = new MutableArray<Weight>();
 
-    public List<Weight> InputWeights { get; private set; } = new List<Weight>();
+    public MutableArray<Weight> InputWeights { get; private set; } = new MutableArray<Weight>();
 
     public void ComputeValue() { }
 
@@ -426,8 +424,6 @@ public class Neuron: INode
     {
         this.actions = activationStrategy;
         this.InputLayer = inputLayer;
-        this.InputWeights = new List<Weight>();
-        this.OutputWeights = new List<Weight>();
         this.Id = id;
 
         InitializeWeights();
@@ -435,7 +431,7 @@ public class Neuron: INode
         Bias = activationStrategy.GetRandomWeight();
     }
 
-    public Neuron(IActivationStrategy actions, List<Weight> inputWeights, List<Weight> outputWeights, double bias, ILayer inputLayer, int id)
+    public Neuron(IActivationStrategy actions, MutableArray<Weight> inputWeights, MutableArray<Weight> outputWeights, double bias, ILayer inputLayer, int id)
     {
         this.actions = actions;
         InputWeights = inputWeights;
@@ -453,11 +449,11 @@ public class Neuron: INode
         }
     }
 
-    public void ComputeValue() => this.Value = actions.ComputeActivation(InputWeights.Select(x => x.Compute()).ToArray().Fast_Sum() + Bias);
+    public void ComputeValue() => this.Value = actions.ComputeActivation(InputWeights.Select(x => x.Compute()).Fast_Sum() + Bias);
 
-    public List<Weight> InputWeights { get; private set; }
+    public MutableArray<Weight> OutputWeights { get; private set; } = new MutableArray<Weight>();
 
-    public List<Weight> OutputWeights { get; private set; }
+    public MutableArray<Weight> InputWeights { get; private set; } = new MutableArray<Weight>();
 
     public double Value { get; private set;}
 
@@ -468,6 +464,10 @@ public class Neuron: INode
     public int Id { get; init; }
 
 }
+
+#region 
+
+#endregion
 
 #region BackPropagation Training
 
@@ -497,15 +497,17 @@ public class GradientAdjustment(Neuron Neuron, double Gradient) : IBackPropagati
     public void AdjustWeights()
     {
         // Adjust Weights
-        foreach (var weight in Neuron.InputWeights)
-        {
-            double delta = Gradient * weight.LinkedFrom.Value;
-            weight.SetWeightTo(weight.Value + delta);
-        }
+        Neuron.InputWeights.Apply(SetWeight);
+
         // Adjust Bias
         Neuron.Bias += Gradient;
     }
 
+    private void SetWeight(Weight weight)
+    {
+        double delta = Gradient * weight.LinkedFrom.Value;
+        weight.SetWeightTo(weight.Value + delta);
+    }
 }
 
 #endregion
