@@ -59,12 +59,7 @@ namespace PerceptrOOn.Exporters
         }
 
         private static void ExportWeights(INode node, List<ExportableWeight> exportedWeights)
-        {
-            foreach (var weight in node.InputWeights)
-            {
-                exportedWeights.Add(new ExportableWeight(weight.Value, weight.LinkedFrom.Id, weight.LinksTo.Id));
-            }
-        }
+            => node.InputWeights.Apply(weight => exportedWeights.Add(new ExportableWeight(weight.Value, weight.LinkedFrom.Id, weight.LinksTo.Id)));
 
         public ILayer[] LoadData(string data)
         {

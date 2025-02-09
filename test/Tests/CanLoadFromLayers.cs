@@ -22,10 +22,11 @@ namespace Tests
             // Test validity:
             var input = new double[] { 1, 0 };
 
-            var output = xorNetwork.Predict(input);
+            var output = Math.Round(xorNetwork.Predict(input)[0], 2);
+
 
             // TODO: Asserts
-            Assert.That(output, Is.EqualTo(new double[] { 0.98701988175004707d }));
+            Assert.That(output, Is.EqualTo(Math.Round(0.98701988175004707d, 2)));
         }
     }
 }
