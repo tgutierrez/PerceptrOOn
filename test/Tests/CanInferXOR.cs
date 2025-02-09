@@ -8,7 +8,7 @@
         }
 
         [Test]
-        public void Test1()
+        public async Task Test1()
         {
             var xorNetwork = new NeuralNetwork(new NetworkDefinition(
                    InputNodes: 2,
@@ -28,7 +28,7 @@
                     TrainingRate: 1
                 );
 
-            xorNetwork.Train(trainingParameters);
+            await xorNetwork.Train(trainingParameters);
 
             var input = new double[] { 1, 0 };
 

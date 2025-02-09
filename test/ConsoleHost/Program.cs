@@ -41,7 +41,6 @@ var osInfo = System.Runtime.InteropServices.RuntimeInformation.OSDescription.ToS
 var hasVectorSupport = Vector.IsHardwareAccelerated;
 
 TrainingData set;
-double[] output;
 var watch = new Stopwatch();
 var random  = new Random();
 using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParameters.Epochs, FixedInBottom=false })

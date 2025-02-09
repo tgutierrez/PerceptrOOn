@@ -27,7 +27,7 @@ namespace PerceptrOOn.Exporters
             var layers = new List<ILayer>();
 
 
-            ILayer previousLayer = null;
+            ILayer? previousLayer = null;
             int lastLayer = exportableNetwork.Layers.Length - 1;
             // extract output and input layer. everything in between will be considered a hidden layer.
             for (int i = 0; i < exportableNetwork.Layers.Length; i++)
@@ -38,16 +38,16 @@ namespace PerceptrOOn.Exporters
                 // check integrity by ensuring that order = id
                 if (deserializedLayer.LayerId != i) throw new InvalidOperationException($"Imported Layer Index does not matches the expected order. Found {i}, Expected {deserializedLayer.LayerId}");
 
-                ILayer layer = null;
+                ILayer? layer = null;
                 if (i == 0)
                 {
                     layer = CreateInputLayer(deserializedLayer);
                 } else if (i == lastLayer)
                 {
-                    layer = CreateOutputLayer(deserializedLayer, previousLayer, activationStrategy);
+                    layer = CreateOutputLayer(deserializedLayer, previousLayer!, activationStrategy);
                 }
                 else {
-                    layer = CreateHiddenLayer(deserializedLayer, previousLayer, activationStrategy);
+                    layer = CreateHiddenLayer(deserializedLayer, previousLayer!, activationStrategy)!;
                 }
 
                 layers.Add(layer);
@@ -93,7 +93,7 @@ namespace PerceptrOOn.Exporters
             return current;
         }
 
-        public TrainingData[] ImportTrainingData(string json) => JsonSerializer.Deserialize(json, SourceGenerationContext.Default.TrainingDataArray);
+        public TrainingData[] ImportTrainingData(string json) => JsonSerializer.Deserialize(json, SourceGenerationContext.Default.TrainingDataArray) ?? throw new InvalidOperationException("Unable to Deserialize Layers Structure");
     }
 
 }

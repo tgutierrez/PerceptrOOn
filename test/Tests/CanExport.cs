@@ -11,7 +11,7 @@ namespace Tests
     public class CanExport
     {
         [Test]
-        public void SerializeToJSON() {
+        public async Task SerializeToJSON() {
 
             var xorNetwork = new NeuralNetwork(new NetworkDefinition(
                InputNodes: 2,
@@ -31,7 +31,7 @@ namespace Tests
                             TrainingRate: 1
                 );
 
-            xorNetwork.Train(trainingParameters);
+            await xorNetwork.Train(trainingParameters);
 
             var exporter = new JSONExporter();
 
