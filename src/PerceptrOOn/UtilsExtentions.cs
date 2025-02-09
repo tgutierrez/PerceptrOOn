@@ -1,17 +1,4 @@
-﻿using HPCsharp.ParallelAlgorithms;
-using Microsoft.VisualBasic;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
-using System.Text;
-using System.Threading.Tasks;
-using System.Transactions;
+﻿using System.Numerics;
 
 namespace PerceptrOOn
 {
@@ -37,6 +24,9 @@ namespace PerceptrOOn
 
         public static double Normalize(this byte input) => input / 255d;
 
+        #region Fast Sum Methods. Lifted from https://github.com/DragonSpit/HPCsharp/blob/81837935698a8b1d412ee6de8a5f04b04a721838/HPCsharp/SumParallel.cs
+
+        // All Credits to https://github.com/DragonSpit/HPCsharp (C) Victor J. Duvanenko.
 
         /// <summary>
         /// If hardware support is available, it will route the sum method to the fast version
@@ -49,6 +39,53 @@ namespace PerceptrOOn
         public static double Fast_Sum(this double[] array) =>
             Vector.IsHardwareAccelerated ? array.SumSse() :              
             array.Sum();
+
+        /// <summary>
+        /// Summation of double[] array, using data parallel SIMD/SSE instructions for higher performance on a single core.
+        /// </summary>
+        /// <param name="arrayToSum">An array to sum up</param>
+        /// <returns>double sum</returns>
+        public static double SumSse(this double[] arrayToSum)
+        {
+            if (arrayToSum == null)
+                throw new ArgumentNullException(nameof(arrayToSum));
+            return arrayToSum.SumSseInner(0, arrayToSum.Length - 1);
+        }
+
+        /// <summary>
+        /// Summation of double[] array, using data parallel SIMD/SSE instructions for higher performance on a single core.
+        /// </summary>
+        /// <param name="arrayToSum">An array to sum up</param>
+        /// <param name="startIndex">index of the starting element for the summation</param>
+        /// <param name="length">number of array elements to sum up</param>
+        /// <returns>double sum</returns>
+
+        public static double SumSse(this double[] arrayToSum, int startIndex, int length)
+        {
+            if (arrayToSum == null)
+                throw new ArgumentNullException(nameof(arrayToSum));
+            return arrayToSum.SumSseInner(startIndex, startIndex + length - 1);
+        }
+
+        private static double SumSseInner(this double[] arrayToSum, int l, int r)
+        {
+            var sumVector = new Vector<double>();
+            int sseIndexEnd = l + ((r - l + 1) / Vector<double>.Count) * Vector<double>.Count;
+            int i;
+            for (i = l; i < sseIndexEnd; i += Vector<double>.Count)
+            {
+                var inVector = new Vector<double>(arrayToSum, i);
+                sumVector += inVector;
+            }
+            double overallSum = 0;
+            for (; i <= r; i++)
+                overallSum += arrayToSum[i];
+            for (i = 0; i < Vector<double>.Count; i++)
+                overallSum += sumVector[i];
+            return overallSum;
+        }
+
+        #endregion
     }
 
 
@@ -123,4 +160,6 @@ namespace PerceptrOOn
         public static implicit operator MutableArray<T>(T[] array) => new MutableArray<T>(array);
 
     }
+
+
 }

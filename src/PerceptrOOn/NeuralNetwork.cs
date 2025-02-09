@@ -1,13 +1,8 @@
 ﻿#region Base Definitions
 
-using HPCsharp;
-using HPCsharp.ParallelAlgorithms;
-using Microsoft.VisualBasic;
 using PerceptrOOn;
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+
 public interface ILayer {
     int Id { get; }
     int Size { get; }
