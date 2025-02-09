@@ -6,6 +6,7 @@ using PerceptrOOn;
 using PerceptrOOn.Exporters;
 using System;
 using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 
@@ -35,12 +36,19 @@ var trainingParameters = new TrainingParameters(
         TrainingRate: 0.01
     );
 
+var cpuInfo = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString();
+var osInfo = System.Runtime.InteropServices.RuntimeInformation.OSDescription.ToString();
+var hasVectorSupport = Vector.IsHardwareAccelerated;
+
 TrainingData set;
 double[] output;
 var watch = new Stopwatch();
 var random  = new Random();
 using (var pb = new ProgressBar  { Maximum= trainingDataSet.Count*trainingParameters.Epochs, FixedInBottom=false })
 {
+    pb.Text.Description.Processing.AddNew().SetValue(pb => $"CPU Architecture        : {cpuInfo}");
+    pb.Text.Description.Processing.AddNew().SetValue(pb => $"OS Info                 : {osInfo}");
+    pb.Text.Description.Processing.AddNew().SetValue(pb => $"Vector Hardware Support : {hasVectorSupport}");
     var mnistNetwork = new NeuralNetwork(new NetworkDefinition(
        InputNodes: 784,
        HiddenLayerNodeDescription: [128],
