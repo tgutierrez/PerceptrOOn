@@ -15,8 +15,8 @@ using System.Text.Json;
  Loads the MNIST Dataset ref https://git-disl.github.io/GTDLBench/datasets/mnist_datasets/
  */
 var data = FileReaderMNIST.LoadImagesAndLables(
-         @"Assets\train-labels-idx1-ubyte.gz"
-        , @"Assets\train-images-idx3-ubyte.gz"
+         @"Assets/train-labels-idx1-ubyte.gz"
+        , @"Assets/train-images-idx3-ubyte.gz"
     ).ToList();
 
 // var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // Uncomment to train full. Warning, 30 epochs, on a Ryzen7700 takes +/- 15m

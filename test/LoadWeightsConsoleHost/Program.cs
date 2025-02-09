@@ -5,11 +5,11 @@ using PerceptrOOn;
 using PerceptrOOn.Exporters;
 
 var data = FileReaderMNIST.LoadImagesAndLables(
-         @"Assets\train-labels-idx1-ubyte.gz"
-        , @"Assets\train-images-idx3-ubyte.gz"
+         @"Assets/train-labels-idx1-ubyte.gz"
+        , @"Assets/train-images-idx3-ubyte.gz"
     ).ToList();
 
-var mnistJSON = File.ReadAllText(@"Assets\mnist.json");
+var mnistJSON = File.ReadAllText(@"Assets/mnist.json");
 
 
 var importer = new JSONImporter();
