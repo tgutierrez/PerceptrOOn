@@ -89,14 +89,14 @@ namespace PerceptrOOn
         public Proj[] Select<Proj>(Func<T, Proj> selector) {
 
             if (values.Length == 0) return Array.Empty<Proj>();
-
+            var span = values.AsSpan();
             Proj[] projection = new Proj[values.Length];    
             int i = 0;
 
 
             do
             {
-                projection[i] = selector(values[i]);
+                projection[i] = selector(span[i]);
                 i++;
             } while (i < projection.Length);
 
@@ -106,13 +106,13 @@ namespace PerceptrOOn
         public void Apply(Action<T> action) 
         {
             if (values.Length == 0) return;
-
+            var span = values.AsSpan();
             int i = 0;
             do
             {
-                action(values[i]);
+                action(span[i]);
                 i++;
-            } while (i < values.Length);
+            } while (i < span.Length);
         }
 
         public T[] Values { get => values; }

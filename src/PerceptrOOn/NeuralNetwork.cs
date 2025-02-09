@@ -338,9 +338,7 @@ public abstract class Layer : ILayer
     public INode[] Content => Neurons;
 
     public void Compute() {
-        foreach (var neuron in neurons) {
-            neuron.ComputeValue();
-        }
+        Parallel.ForEach(neurons, (neuron) => { neuron.ComputeValue(); });
     }
 
     public double[] CollectOutput() =>
@@ -499,16 +497,17 @@ public class GradientAdjustment(Neuron Neuron, double Gradient) : IBackPropagati
     public void AdjustWeights()
     {
         // Adjust Weights
-        //foreach (var weight in Neuron.InputWeights)
-        Neuron.InputWeights.Apply(weight =>
-        {
-            double delta = Gradient * weight.LinkedFrom.Value;
-            weight.SetWeightTo(weight.Value + delta);
-        });
+        Neuron.InputWeights.Apply(SetWeight);
+
         // Adjust Bias
         Neuron.Bias += Gradient;
     }
 
+    private void SetWeight(Weight weight)
+    {
+        double delta = Gradient * weight.LinkedFrom.Value;
+        weight.SetWeightTo(weight.Value + delta);
+    }
 }
 
 #endregion
