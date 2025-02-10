@@ -51,6 +51,13 @@ await AnsiConsole.Progress()
     
     data = data.Where(z => labels.Any(l => l == z.Label)).ToList();
 
+    var dataAsSpan = data.ToArray().AsSpan();
+
+    // Randomize set
+    new Random().Shuffle(dataAsSpan);
+
+    data  = dataAsSpan.ToArray().ToList();
+
     var loadingSet = ctx.AddTask("Converting Images into Training Set:", new ProgressTaskSettings { MaxValue = data.Count() });
     foreach (var node in data) {
         trainingDataSet.Add(new TrainingData(node.Image.Flatten2DMatrix() , node.Label.ByteToFlatOutput(labels.Length)));
@@ -61,7 +68,7 @@ await AnsiConsole.Progress()
 
     var trainingParameters = new TrainingParameters(
             TrainingDataSet: trainingDataSet.ToArray(),
-            Epochs: 1,
+            Epochs: 3,
             TrainingRate: 0.01
         );
 
@@ -73,6 +80,10 @@ await AnsiConsole.Progress()
            InputNodes: 784,
            HiddenLayerNodeDescription: [128],
            OutputNodes: labels.Length, // Size of the label set will dictate the length
+           //ActivationStrategy: new ReLuActivationStrategy(   // ReLu still WIP
+           //    seed: 1337,
+           //    randomWeightExpression: (r) => 0,
+           //    biasInitializationExpression: (r) => 0.01),
            ActivationStrategy: new SigmoidActivationStrategy(seed: 1337),
            NotificationCallback: (current, total, description) => { trainingTask.Increment(1); }
         ));
@@ -107,7 +118,7 @@ foreach (var index in Enumerable.Range(0, 10))
         });
     }
 
-    table.AddColumn("Outcome");
+    table.AddColumn("Confidence");
 
     set = trainingDataSet[new Random().Next(trainingDataSet.Count)];
     var result = mnistNetwork!.Predict(set.input);
@@ -137,11 +148,16 @@ static string Evaluate(double[] expected, double[] predicted) {
 
     var expectedIndex = Array.FindIndex(expected, match => match == 1);
 
+    var max = predicted.Max();
+    var indexOfMax = Array.FindIndex(predicted, match => match == max);
+
+    if (indexOfMax != expectedIndex) return $"[red]Incorrect[/]";
+
     return predicted[expectedIndex]  switch
     {   
-        >= 0d and < 0.3d       => $"[red]Error[/]",
+        >= 0d and < 0.3d     => $"[red]Low[/]",
         > 0.3d and < 0.7d      => $"[yellow]Weak[/]",
-        >=0.7d                   => $"[green]Good[/]",
+        >=0.7d                   => $"[green]High[/]",
         _ => throw new NotImplementedException(),
     };
 }

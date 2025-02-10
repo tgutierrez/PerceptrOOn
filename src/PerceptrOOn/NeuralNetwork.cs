@@ -60,6 +60,7 @@ public interface IActivationStrategy
     double ComputeActivation(double input);
     double ComputeActivationDerivative (double input);
     double GetRandomWeight();
+    double GetInitialBias();
 }
 
 public interface INetworkExporter<T>
@@ -108,8 +109,35 @@ public class SigmoidActivationStrategy : IActivationStrategy
     public double ComputeActivationDerivative (double x) => x * (1 - x);
 
     public double GetRandomWeight() => rand.NextDouble() *2 -1;
+
+    public double GetInitialBias() => GetRandomWeight();
 }
 
+public class ReLuActivationStrategy : IActivationStrategy
+{
+    public ReLuActivationStrategy(int? seed = default, Func<Random, double>? randomWeightExpression = null, Func<Random, double>? biasInitializationExpression = null) {
+        rand = seed.HasValue? new Random(seed.Value) : new Random();
+        this.randomWeightExpression = randomWeightExpression ?? new Func<Random, double>((r) => r.NextDouble() * 2 - 1);
+        this.getBiasInitExpression  = biasInitializationExpression ?? this.randomWeightExpression;
+    }
+
+    private readonly Func<Random, double> randomWeightExpression;
+    private readonly Func<Random, double> getBiasInitExpression;
+
+    private readonly Random rand;
+
+    public string Name => "ReLu";
+
+    public double ComputeActivation(double input) => Math.Max(0, input);
+
+    public double ComputeActivationDerivative(double input) => input switch {
+        > 0 => 1,
+        _ => 0,
+    };
+      
+    public double GetRandomWeight() => randomWeightExpression(rand);
+    public double GetInitialBias() => getBiasInitExpression(rand);
+}
 
 public static class ActivationStrategyFactory {
 
@@ -117,6 +145,7 @@ public static class ActivationStrategyFactory {
         => name switch
         {
             "Sigmoid" => new SigmoidActivationStrategy(seed),
+            "ReLu" => new ReLuActivationStrategy(), // ReLu with random weights -1 ... 1
             _ => throw new NotImplementedException()
         };
 }
@@ -423,7 +452,7 @@ public class Neuron: INode
 
         InitializeWeights();
 
-        Bias = activationStrategy.GetRandomWeight();
+        Bias = activationStrategy.GetInitialBias();
     }
 
     public Neuron(IActivationStrategy actions, MutableArray<Weight> inputWeights, MutableArray<Weight> outputWeights, double bias, ILayer inputLayer, int id)
