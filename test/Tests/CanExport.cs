@@ -1,4 +1,5 @@
-﻿using PerceptrOOn.Exporters;
+﻿using PerceptrOOn;
+using PerceptrOOn.Exporters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +18,7 @@ namespace Tests
                InputNodes: 2,
                HiddenLayerNodeDescription: [2, 2],
                OutputNodes: 1,
-               ActivationStrategy: new SigmoidActivationStrategy(5)
+               Strategies: new Strategies(new SigmoidActivationStrategy(5), new DefaultComputeStrategy())
             ));
 
                     var trainingParameters = new TrainingParameters(

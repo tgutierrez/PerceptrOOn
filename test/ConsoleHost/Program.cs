@@ -84,7 +84,7 @@ await AnsiConsole.Progress()
            //    seed: 1337,
            //    randomWeightExpression: (r) => 0,
            //    biasInitializationExpression: (r) => 0.01),
-           ActivationStrategy: new SigmoidActivationStrategy(seed: 1337),
+           Strategies: new Strategies(new SigmoidActivationStrategy(seed: 1337), new DefaultComputeStrategy()),
            NotificationCallback: (current, total, description) => { trainingTask.Increment(1); }
         ));
 
@@ -121,7 +121,7 @@ foreach (var index in Enumerable.Range(0, 10))
     table.AddColumn("Confidence");
 
     set = trainingDataSet[new Random().Next(trainingDataSet.Count)];
-    var result = mnistNetwork!.Predict(set.input);
+    var result = await mnistNetwork!.Predict(set.input);
 
     CreateRows(table, "Predicting", set.expectedOutput, "-");
     CreateRows(table, "Output", result, Evaluate(set.expectedOutput, result));

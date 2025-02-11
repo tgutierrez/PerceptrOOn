@@ -12,17 +12,19 @@ namespace PerceptrOOn.Exporters
 {
     public class JSONImporter : INetworkImporter<string>
     {
-        public ILayer[] Import(string networkData, Func<IActivationStrategy>? activationStrategyFactory = default)
+        public ILayer[] Import(string networkData, Func<Strategies>? strategyProvider = default)
         {
             var exportableNetwork = JsonSerializer.Deserialize(networkData, SourceGenerationContext.Default.ExportableNetwork) ?? throw new InvalidOperationException("Network cannot be serialized");
 
-            var activationStrategy = activationStrategyFactory?.Invoke() ?? ActivationStrategyFactory.Create(exportableNetwork.ActivationStrategy);
+            var strategies = strategyProvider?.Invoke() ?? new Strategies(ActivationStrategyFactory.Create(exportableNetwork.ActivationStrategy), 
+                                                                          ComputeStrategyFactory.Create(exportableNetwork.ComputeStrategy)
+                                                                          );
 
-            return Import(exportableNetwork, activationStrategy);
+            return Import(exportableNetwork, strategies);
         }
 
 
-        private ILayer[] Import(ExportableNetwork exportableNetwork, IActivationStrategy activationStrategy)
+        private ILayer[] Import(ExportableNetwork exportableNetwork, Strategies strategies)
         {
             var layers = new List<ILayer>();
 
@@ -44,10 +46,10 @@ namespace PerceptrOOn.Exporters
                     layer = CreateInputLayer(deserializedLayer);
                 } else if (i == lastLayer)
                 {
-                    layer = CreateOutputLayer(deserializedLayer, previousLayer!, activationStrategy);
+                    layer = CreateOutputLayer(deserializedLayer, previousLayer!, strategies);
                 }
                 else {
-                    layer = CreateHiddenLayer(deserializedLayer, previousLayer!, activationStrategy)!;
+                    layer = CreateHiddenLayer(deserializedLayer, previousLayer!, strategies)!;
                 }
 
                 layers.Add(layer);
@@ -58,11 +60,11 @@ namespace PerceptrOOn.Exporters
             return layers.ToArray();
         }
 
-        private ILayer? CreateHiddenLayer(ExportableLayer deserializedLayer, ILayer previousLayer, IActivationStrategy activationStrategy)
-            => new HiddenLayer(GetNeurons(deserializedLayer.Nodes, previousLayer, activationStrategy), activationStrategy, previousLayer, deserializedLayer.LayerId);
+        private ILayer? CreateHiddenLayer(ExportableLayer deserializedLayer, ILayer previousLayer, Strategies strategies)
+            => new HiddenLayer(GetNeurons(deserializedLayer.Nodes, previousLayer, strategies), strategies, previousLayer, deserializedLayer.LayerId);
 
-        private ILayer CreateOutputLayer(ExportableLayer deserializedLayer, ILayer previousLayer, IActivationStrategy activationStrategy)
-            => new OutputLayer(GetNeurons(deserializedLayer.Nodes, previousLayer, activationStrategy), activationStrategy, previousLayer, deserializedLayer.LayerId);
+        private ILayer CreateOutputLayer(ExportableLayer deserializedLayer, ILayer previousLayer, Strategies strategies)
+            => new OutputLayer(GetNeurons(deserializedLayer.Nodes, previousLayer, strategies), strategies, previousLayer, deserializedLayer.LayerId);
 
         private ILayer CreateInputLayer(ExportableLayer deserializedLayer)
             => new InputLayer(GetInputs(deserializedLayer.Nodes));
@@ -70,14 +72,14 @@ namespace PerceptrOOn.Exporters
         private InputNode[] GetInputs(ExportableNode[] nodes)
             => nodes.Select(p => new InputNode(p.NodeId)).ToArray();
 
-        private Neuron[] GetNeurons(ExportableNode[] nodes, ILayer previousLayer, IActivationStrategy activationStrategy)
+        private Neuron[] GetNeurons(ExportableNode[] nodes, ILayer previousLayer, Strategies activationStrategy)
             => nodes.Select(n => CreateNeuron(previousLayer, activationStrategy, n)).ToArray();
 
-        private static Neuron CreateNeuron(ILayer previousLayer, IActivationStrategy activationStrategy, ExportableNode exportableNode)
+        private static Neuron CreateNeuron(ILayer previousLayer, Strategies strategies, ExportableNode exportableNode)
         {
             var inputWeights = new MutableArray<Weight>();
             var outputWeights = new MutableArray<Weight>();
-            var current = new Neuron(activationStrategy,
+            var current = new Neuron(strategies,
                                                         inputWeights,  //n.Weights.Select(p => CreateWeight(n, p, previousLayer)).ToList(),
                                                         outputWeights,
                                                         exportableNode.Bias ?? 0d,

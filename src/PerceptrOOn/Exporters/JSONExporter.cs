@@ -23,13 +23,13 @@ namespace PerceptrOOn.Exporters
     /// </remarks>
     public class JSONExporter : INetworkExporter<string>
     {
-        public string Export(ILayer[] layers, IActivationStrategy activationStrategy)
+        public string Export(ILayer[] layers, Strategies strategies)
         {
             var exportableLayer = new List<ExportableLayer>();
 
             ExportLayers(layers, exportableLayer);
 
-            var exportableNetwork = new ExportableNetwork(exportableLayer.ToArray(), activationStrategy.Name);
+            var exportableNetwork = new ExportableNetwork(exportableLayer.ToArray(), strategies.ActivationStrategy.Name, strategies.ComputeStrategies.Name);
 
             return JsonSerializer.Serialize(exportableNetwork, SourceGenerationContext.Default.ExportableNetwork);
         }
@@ -70,7 +70,7 @@ namespace PerceptrOOn.Exporters
     }
 
 
-    internal record ExportableNetwork(ExportableLayer[] Layers, string ActivationStrategy);
+    internal record ExportableNetwork(ExportableLayer[] Layers, string ActivationStrategy, string ComputeStrategy);
 
     internal record ExportableLayer(ExportableNode[] Nodes, int LayerId);
 

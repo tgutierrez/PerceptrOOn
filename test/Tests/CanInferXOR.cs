@@ -1,4 +1,6 @@
-﻿namespace Tests
+﻿using PerceptrOOn;
+
+namespace Tests
 {
     public class CanInferXOR
     {
@@ -14,7 +16,7 @@
                    InputNodes: 2,
                    HiddenLayerNodeDescription: [2, 2],
                    OutputNodes: 1,
-                   ActivationStrategy: new SigmoidActivationStrategy(5)
+                   Strategies: new Strategies(new SigmoidActivationStrategy(5), new DefaultComputeStrategy())
                 ));
 
             var trainingParameters = new TrainingParameters(
@@ -32,7 +34,7 @@
 
             var input = new double[] { 1, 0 };
 
-            var output = xorNetwork.Predict(input);
+            var output = await xorNetwork.Predict(input);
 
             // TODO: Asserts
             Assert.That(output, Is.EqualTo(new double[] { 0.98701988175004707d }));

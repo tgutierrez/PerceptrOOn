@@ -16,7 +16,7 @@ public interface INode
     int Id { get; }
     public double Value { get; }
 
-    public void ComputeValue();
+    public Task ComputeValue();
 
     public MutableArray<Weight> OutputWeights { get; }
 
@@ -63,21 +63,32 @@ public interface IActivationStrategy
     double GetInitialBias();
 }
 
+public interface IComputeStrategies 
+{
+    string Name { get; }
+    Task ComputeLayer<T>(IActivationStrategy strategy, T layer) where T : ILayer;
+    Task<double> ComputeNode<T>(IActivationStrategy strategy, T node) where T : INode;
+}
+
 public interface INetworkExporter<T>
 {
-    public T Export(ILayer[] layer, IActivationStrategy activationStrategy);
+    public T Export(ILayer[] layer, Strategies strategies);
 }
 
 public interface INetworkImporter<T> 
 {
-    public ILayer[] Import(T networkData, Func<IActivationStrategy>? activationStrategyFactory);
+    public ILayer[] Import(T networkData, Func<Strategies>? strategyProvider);
 
 }
 
 public delegate void Notify(int current, int total, string description);
 
+public class Strategies(IActivationStrategy activationStrategy, IComputeStrategies computeStrategies) { 
+    public IActivationStrategy ActivationStrategy => activationStrategy;
+    public IComputeStrategies ComputeStrategies => computeStrategies;
+};
 
-public record NetworkDefinition(int InputNodes, int[] HiddenLayerNodeDescription, int OutputNodes, IActivationStrategy ActivationStrategy, Notify? NotificationCallback = null);
+public record NetworkDefinition(int InputNodes, int[] HiddenLayerNodeDescription, int OutputNodes, Strategies Strategies, Notify? NotificationCallback = null);
 public record TrainingData(double[] input, double[] expectedOutput);
 public record TrainingParameters(TrainingData[] TrainingDataSet, int Epochs, double TrainingRate);
 
@@ -150,6 +161,16 @@ public static class ActivationStrategyFactory {
         };
 }
 
+
+
+public static class ComputeStrategyFactory {
+    public static IComputeStrategies Create(string name, int? seed = default)
+    => name switch
+    {
+        _ => new DefaultComputeStrategy(),
+    };
+}
+
 #endregion
 
 /// <summary>
@@ -162,7 +183,7 @@ public static class ActivationStrategyFactory {
 public class NeuralNetwork
 {
     private readonly ILayer[] layers;
-    private readonly IActivationStrategy activationStrategy;
+    private readonly Strategies strategies;
     
     private InputLayer InputLayer => (layers[0] as InputLayer)!;
     private Layer OutputLayer => (layers[^1] as Layer)!;
@@ -175,7 +196,7 @@ public class NeuralNetwork
     /// </summary>
     /// <param name="definition"></param>
     public NeuralNetwork(NetworkDefinition definition) { 
-        this.activationStrategy = definition.ActivationStrategy;
+        this.strategies = definition.Strategies;
         layers = BuildLayers(definition);
         this.Definition = definition;
     }
@@ -186,11 +207,11 @@ public class NeuralNetwork
     /// <param name="layers"></param>
     /// <param name="activationStrategy"></param>
     /// <exception cref="NotImplementedException"></exception>
-    public NeuralNetwork(ILayer[] layers, IActivationStrategy activationStrategy) { 
+    public NeuralNetwork(ILayer[] layers, Strategies strategies) { 
         this.layers = layers;
-        this.activationStrategy = activationStrategy;
+        this.strategies = strategies;
         var hiddenDefinitions = HiddenLayer.ToList().Select(h => h.Neurons.Length).ToArray();
-        this.Definition = new NetworkDefinition(InputLayer.Size, hiddenDefinitions, this.OutputLayer.Size, activationStrategy); // infer definition based on the layer structure
+        this.Definition = new NetworkDefinition(InputLayer.Size, hiddenDefinitions, this.OutputLayer.Size, strategies); // infer definition based on the layer structure
         // TODO: Validate input
     }
 
@@ -203,18 +224,18 @@ public class NeuralNetwork
 
         int layerIndex = 1;
         foreach (var description in definition.HiddenLayerNodeDescription) {
-            var newHiddenLayer = new HiddenLayer(previousLayer, description, this.activationStrategy);
+            var newHiddenLayer = new HiddenLayer(previousLayer, description, this.strategies);
             layerList.Add(newHiddenLayer);
             previousLayer = newHiddenLayer;
             layerIndex++;
         }
 
-        layerList.Add(new OutputLayer(previousLayer, definition.OutputNodes, activationStrategy));
+        layerList.Add(new OutputLayer(previousLayer, definition.OutputNodes, strategies));
 
         return layerList.ToArray();
     }
 
-    public double[] Predict(double[] input)
+    public async Task<double[]> Predict(double[] input)
     {
         // Collect inputs
         InputLayer.CollectInput(input);
@@ -222,11 +243,11 @@ public class NeuralNetwork
         // Compute Hidden Layers
         foreach (var hiddenLayer in this.HiddenLayer)
         {
-            hiddenLayer.Compute();
+            await hiddenLayer.Compute();
         }
 
         // Compute Output
-        OutputLayer.Compute();
+        await OutputLayer.Compute();
 
         // Collect Result and  return
         return OutputLayer.CollectOutput();
@@ -255,7 +276,7 @@ public class NeuralNetwork
     private async Task TrainingCycle(TrainingData trainingSet, int epoch, double rate)
     {
         // 1 - Compute
-        this.Predict(trainingSet.input);
+        await this.Predict(trainingSet.input);
         // 2 - Collect errors (predicted vs actual)
         var outputErrors = this.OutputLayer
                         .Neurons
@@ -267,10 +288,10 @@ public class NeuralNetwork
     }
 
     public T ExportWith<E, T>() where E : INetworkExporter<T>, new()
-        => new E().Export(layers, activationStrategy);
+        => new E().Export(layers, strategies);
 
 
-    public T Export<T>(INetworkExporter<T> exporter) => exporter.Export(layers, activationStrategy);
+    public T Export<T>(INetworkExporter<T> exporter) => exporter.Export(layers, strategies);
 }
 
 /// <summary>
@@ -328,23 +349,23 @@ public class InputLayer : ILayer
 public abstract class Layer : ILayer 
 {
     private readonly Neuron[] neurons;
-    internal IActivationStrategy activationStrategy;
-    public Layer(ILayer inputLayer, int size, IActivationStrategy activationStrategy) {
+    internal Strategies strategies;
+    public Layer(ILayer inputLayer, int size, Strategies strategies) {
         this.Id = inputLayer.Id+1;
         this.InputLayer = inputLayer;
         this.Size = size;
-        this.activationStrategy = activationStrategy;
+        this.strategies = strategies;
         neurons = new Neuron[size];
         foreach (int index in Enumerable.Range(0, size))
         {
-            neurons[index] = new Neuron(activationStrategy, this.InputLayer, index);
+            neurons[index] = new Neuron(strategies, this.InputLayer, index);
         }
     }
 
-    public Layer(Neuron[] neurons, IActivationStrategy activationStrategy, ILayer inputLayer, int id)
+    public Layer(Neuron[] neurons, Strategies strategies, ILayer inputLayer, int id)
     {
         this.neurons = neurons;
-        this.activationStrategy = activationStrategy;
+        this.strategies = strategies;
         InputLayer = inputLayer;
         Id = id;
         Size = this.neurons.Length;
@@ -361,8 +382,8 @@ public abstract class Layer : ILayer
 
     public INode[] Content => Neurons;
 
-    public void Compute() {
-        Parallel.ForEach(neurons, (neuron) => { neuron.ComputeValue(); });
+    public async Task Compute() {
+        await strategies.ComputeStrategies.ComputeLayer(strategies.ActivationStrategy, this);
     }
 
     public double[] CollectOutput() =>
@@ -374,8 +395,8 @@ public abstract class Layer : ILayer
 
 public class HiddenLayer : Layer
 {
-    public HiddenLayer(ILayer inputLayer, int size, IActivationStrategy activationStrategy) : base(inputLayer, size, activationStrategy) { }
-    public HiddenLayer(Neuron[] neurons, IActivationStrategy activationStrategy, ILayer inputLayer, int id)  : base(neurons, activationStrategy, inputLayer, id) { }
+    public HiddenLayer(ILayer inputLayer, int size, Strategies strategies) : base(inputLayer, size, strategies) { }
+    public HiddenLayer(Neuron[] neurons, Strategies strategies, ILayer inputLayer, int id)  : base(neurons, strategies, inputLayer, id) { }
     public override async Task BackPropagate(IBackPropagationInput[] gradients, double rate) 
     {
         var hiddenGradients = new ConcurrentBag<Tuple<int, GradientAdjustment>>();
@@ -387,7 +408,7 @@ public class HiddenLayer : Layer
 
             double error = neuron.OutputWeights.Select(k => gradients[k.LinksTo.Id].Value * k.Value).ToArray().Fast_Sum();
 
-            var hiddenGradient = new GradientAdjustment(neuron, error * activationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
+            var hiddenGradient = new GradientAdjustment(neuron, error * strategies.ActivationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
             hiddenGradient.AdjustWeights();
             hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
         });
@@ -399,14 +420,14 @@ public class HiddenLayer : Layer
 
 public class OutputLayer : Layer 
 {
-    public OutputLayer(ILayer inputLayer, int size, IActivationStrategy activationStrategy) : base(inputLayer, size, activationStrategy) { }
-    public OutputLayer(Neuron[] neurons, IActivationStrategy activationStrategy, ILayer inputLayer, int id) : base(neurons, activationStrategy, inputLayer, id) { }
+    public OutputLayer(ILayer inputLayer, int size, Strategies strategies) : base(inputLayer, size, strategies) { }
+    public OutputLayer(Neuron[] neurons, Strategies strategies, ILayer inputLayer, int id) : base(neurons, strategies, inputLayer, id) { }
     public override async Task BackPropagate(IBackPropagationInput[] backPropagationInput, double rate) 
     {
         var gradients = new List<IBackPropagationInput>();
         foreach (OutputErrorAdjustment input in backPropagationInput)
         {
-            var outputGradient = input.CreateOuput(this.activationStrategy, rate);
+            var outputGradient = input.CreateOuput(this.strategies, rate);
             outputGradient.AdjustWeights();
             gradients.Add(outputGradient);
         }
@@ -429,7 +450,7 @@ public class InputNode(int id) : INode
 
     public MutableArray<Weight> InputWeights { get; private set; } = new MutableArray<Weight>();
 
-    public void ComputeValue() { }
+    public Task ComputeValue() => Task.CompletedTask;
 
     public void SetValue(double value) { 
         this.Value = value;
@@ -442,22 +463,22 @@ public class InputNode(int id) : INode
 public class Neuron: INode
 {
 
-    private readonly IActivationStrategy actions;
+    private readonly Strategies strategies;
     
-    public Neuron(IActivationStrategy activationStrategy, ILayer inputLayer, int id)
+    public Neuron(Strategies strategies, ILayer inputLayer, int id)
     {
-        this.actions = activationStrategy;
+        this.strategies = strategies;
         this.InputLayer = inputLayer;
         this.Id = id;
 
         InitializeWeights();
 
-        Bias = activationStrategy.GetInitialBias();
+        Bias = strategies.ActivationStrategy.GetInitialBias();
     }
 
-    public Neuron(IActivationStrategy actions, MutableArray<Weight> inputWeights, MutableArray<Weight> outputWeights, double bias, ILayer inputLayer, int id)
+    public Neuron(Strategies strategies, MutableArray<Weight> inputWeights, MutableArray<Weight> outputWeights, double bias, ILayer inputLayer, int id)
     {
-        this.actions = actions;
+        this.strategies = strategies;
         InputWeights = inputWeights;
         OutputWeights = outputWeights;
         Bias = bias;
@@ -469,11 +490,11 @@ public class Neuron: INode
     {
         foreach (var input in InputLayer.Content)
         {
-            this.InputWeights.Add(new Weight(input, this, actions.GetRandomWeight()));
+            this.InputWeights.Add(new Weight(input, this, strategies.ActivationStrategy.GetRandomWeight()));
         }
     }
 
-    public void ComputeValue() => this.Value = actions.ComputeActivation(InputWeights.Select(x => x.Compute()).Fast_Sum() + Bias);
+    public async Task ComputeValue() => this.Value = await strategies.ComputeStrategies.ComputeNode(strategies.ActivationStrategy, this); // strategies.ActivationStrategy.ComputeActivation(InputWeights.Select(x => x.Compute()).Fast_Sum() + Bias);
 
     public MutableArray<Weight> OutputWeights { get; private set; } = new MutableArray<Weight>();
 
@@ -501,9 +522,9 @@ public class OutputErrorAdjustment(Neuron Neuron, double Error) : IBackPropagati
 
     public double Value => Error;
 
-    public IBackPropagationInput CreateOuput(IActivationStrategy activationStrategy, double rate)
+    public IBackPropagationInput CreateOuput(Strategies strategies, double rate)
     {
-        return new GradientAdjustment(Neuron, Value*activationStrategy.ComputeActivationDerivative(Neuron.Value)*rate);
+        return new GradientAdjustment(Neuron, Value* strategies.ActivationStrategy.ComputeActivationDerivative(Neuron.Value)*rate);
     }
 
     public void AdjustWeights()
