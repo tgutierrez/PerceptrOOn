@@ -11,7 +11,8 @@ TrainingData set;
 NeuralNetwork? mnistNetwork = null;
 var trainingDataSet = new List<TrainingData>();
 
-var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
+//var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
+var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // Uncomment to train full. Warning, 30 epochs, on a Ryzen7700 takes +/- 15m
 
 await AnsiConsole.Progress()
     .AutoClear(false)
@@ -46,8 +47,6 @@ await AnsiConsole.Progress()
          @"Assets/train-labels-idx1-ubyte.gz"
         , @"Assets/train-images-idx3-ubyte.gz"
     ).ToList();
-    // var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // Uncomment to train full. Warning, 30 epochs, on a Ryzen7700 takes +/- 15m
-
     
     data = data.Where(z => labels.Any(l => l == z.Label)).ToList();
 
@@ -68,7 +67,7 @@ await AnsiConsole.Progress()
 
     var trainingParameters = new TrainingParameters(
             TrainingDataSet: trainingDataSet.ToArray(),
-            Epochs: 3,
+            Epochs: 10  ,
             TrainingRate: 0.01
         );
 
@@ -80,10 +79,12 @@ await AnsiConsole.Progress()
            InputNodes: 784,
            HiddenLayerNodeDescription: [128],
            OutputNodes: labels.Length, // Size of the label set will dictate the length
-           //ActivationStrategy: new ReLuActivationStrategy(   // ReLu still WIP
+           //Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu
            //    seed: 1337,
            //    randomWeightExpression: (r) => 0,
            //    biasInitializationExpression: (r) => 0.01),
+           //     new DefaultComputeStrategy()               
+           //    ),
            Strategies: new Strategies(new SigmoidActivationStrategy(seed: 1337), new DefaultComputeStrategy()),
            NotificationCallback: (current, total, description) => { trainingTask.Increment(1); }
         ));

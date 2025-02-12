@@ -3,6 +3,7 @@
 using MNIST.IO;
 using PerceptrOOn;
 using PerceptrOOn.Exporters;
+using System.Text.Json;
 
 var data = FileReaderMNIST.LoadImagesAndLables(
          @"Assets/train-labels-idx1-ubyte.gz"
@@ -11,9 +12,10 @@ var data = FileReaderMNIST.LoadImagesAndLables(
 
 var mnistJSON = File.ReadAllText(@"Assets/mnist.json");
 
-
 var importer = new JSONImporter();
 var layers = importer.Import(mnistJSON);
+
+
 
 var xorNetwork = new NeuralNetwork(layers, new Strategies(new SigmoidActivationStrategy(), new DefaultComputeStrategy()));
 

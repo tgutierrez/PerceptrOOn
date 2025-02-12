@@ -6,8 +6,16 @@ using System.Threading.Tasks;
 
 namespace PerceptrOOn
 {
-    public class DefaultComputeStrategy : IComputeStrategies
+    public class DefaultComputeStrategy: IComputeStrategies
     {
+        public readonly Func<double[], double> GetSum;
+
+        public DefaultComputeStrategy(bool useFastSum = true) {
+            GetSum = useFastSum?
+                                (s) => s.Fast_Sum():
+                                (s) => s.Sum();
+        }
+
         public string Name => "Default";
 
         public Task ComputeLayer<T>(IActivationStrategy strategy, T layer) where T : ILayer
@@ -35,7 +43,7 @@ namespace PerceptrOOn
         }
 
         private double ComputeNeuron(IActivationStrategy strategy, Neuron neuron) {
-            return strategy.ComputeActivation(neuron.InputWeights.Select(x => x.Compute()).Fast_Sum() + neuron.Bias);
+            return strategy.ComputeActivation(GetSum(neuron.InputWeights.Select(x => x.Compute())) + neuron.Bias);
         }
 
     }
