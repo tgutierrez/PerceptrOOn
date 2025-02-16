@@ -78,7 +78,10 @@ namespace PerceptrOOn.Exporters
 
     internal record ExportableWeight(double Value, int FromNodeId, int ToNodeId);
 
-    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSourceGenerationOptions(
+        WriteIndented = true,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
+    )]
     [JsonSerializable(typeof(ExportableNetwork))]
     [JsonSerializable(typeof(ExportableLayer))]
     [JsonSerializable(typeof(ExportableNode))]

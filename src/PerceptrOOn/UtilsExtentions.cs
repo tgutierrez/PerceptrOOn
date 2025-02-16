@@ -4,6 +4,10 @@ namespace PerceptrOOn
 {
     public static class UtilsExtentions
     {
+        public static double Clamp(this double value, double min, double max) => Math.Max(min, Math.Min(max, value));
+
+        public static double CoalesceInfinite(this double value) => double.IsFinite(value)? value : 0.0d;
+
         public static double[] ByteToFlatOutput(this byte label, int outputSize)
         {
             double[] output = new double[outputSize];
@@ -159,6 +163,7 @@ namespace PerceptrOOn
 
         public static implicit operator MutableArray<T>(T[] array) => new MutableArray<T>(array);
 
+        
     }
 
 

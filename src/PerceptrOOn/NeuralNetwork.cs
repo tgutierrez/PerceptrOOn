@@ -3,6 +3,8 @@
 using PerceptrOOn;
 using System.Collections.Concurrent;
 
+namespace PerceptrOOn;
+
 public interface ILayer {
     int Id { get; }
     int Size { get; }
@@ -28,7 +30,7 @@ public class Weight
 {
     private readonly INode linkedFrom;
     private readonly INode linksTo;
-
+    private const double MaxWeight = 5.0; // Prevent extreme weight values
     public Weight(INode linkedFrom, INode linksTo, double initialValue)
     {
         this.linkedFrom = linkedFrom;
@@ -45,12 +47,14 @@ public class Weight
 
     public double Compute()
     {
-        return Value * LinkedFrom.Value;
+        return (Value * LinkedFrom.Value)
+                    .CoalesceInfinite()
+                    .Clamp(-MaxWeight, MaxWeight);
     }
 
     public void SetWeightTo(double value)
     {
-        Value = value;
+        Value = value.Clamp(-MaxWeight, MaxWeight);
     }
 };
 
@@ -91,7 +95,6 @@ public class Strategies(IActivationStrategy activationStrategy, IComputeStrategi
 public record NetworkDefinition(int InputNodes, int[] HiddenLayerNodeDescription, int OutputNodes, Strategies Strategies, Notify? NotificationCallback = null);
 public record TrainingData(double[] input, double[] expectedOutput);
 public record TrainingDataPreservingOriginal<T>(T Original, double[] input, double[] expectedOutput) : TrainingData(input, expectedOutput);
-public record TrainingParameters(TrainingData[] TrainingDataSet, int Epochs, double TrainingRate);
 
 #endregion
 
@@ -101,7 +104,7 @@ public interface IBackPropagationInput {
 
     INode Node { get; }
 
-    void AdjustWeights();
+    void AdjustWeights(double learningRate);
 
 }
 
@@ -109,6 +112,7 @@ public interface IBackPropagationInput {
 
 public class SigmoidActivationStrategy : IActivationStrategy
 {
+    private const double MaxInput = 15.0; // Prevent exp overflow
     private Random rand; 
 
     public SigmoidActivationStrategy(int? seed = default) {
@@ -116,7 +120,7 @@ public class SigmoidActivationStrategy : IActivationStrategy
     }
     public string Name => "Sigmoid";
 
-    public double ComputeActivation(double x) => 1.0 / (1.0 + Math.Exp(-x));
+    public double ComputeActivation(double x) => 1.0 / (1.0 + Math.Exp(-x.Clamp(-MaxInput, MaxInput)));
 
     public double ComputeActivationDerivative (double x) => x * (1 - x);
 
@@ -190,7 +194,7 @@ public static class ComputeStrategyFactory {
 /// <param name="input">Input data for the netwrokk</param>
 /// <param name="numberOfLayers"></param>
 /// <param name="actionFunctions"></param>
-public class NeuralNetwork
+public partial class NeuralNetwork
 {
     private readonly ILayer[] layers;
     private readonly Strategies strategies;
@@ -240,7 +244,8 @@ public class NeuralNetwork
             layerIndex++;
         }
 
-        layerList.Add(new OutputLayer(previousLayer, definition.OutputNodes, strategies));
+        //layerList.Add(new OutputLayer(previousLayer, definition.OutputNodes, strategies));
+        layerList.Add(new SoftmaxLayer(previousLayer, definition.OutputNodes, strategies));
 
         return layerList.ToArray();
     }
@@ -267,13 +272,13 @@ public class NeuralNetwork
     /// Train the network using backpropagation
     /// </summary>
     /// <param name="trainingParameters">Parameters</param>
-    public async Task Train(TrainingParameters trainingParameters)
-    {
-        foreach (var epoch in Enumerable.Range(0, trainingParameters.Epochs))
-        {
-            await TrainingEpoch(trainingParameters, epoch, trainingParameters.TrainingRate);
-        }      
-    }
+    //public async Task Train(TrainingParameters trainingParameters)
+    //{
+    //    foreach (var epoch in Enumerable.Range(0, trainingParameters.Epochs))
+    //    {
+    //        await TrainingEpoch(trainingParameters, epoch, trainingParameters.TrainingRate);
+    //    }      
+    //}
 
     private async Task TrainingEpoch(TrainingParameters trainingParameters, int epoch, double rate) {
         foreach (var trainingSet in trainingParameters.TrainingDataSet)
@@ -392,7 +397,7 @@ public abstract class Layer : ILayer
 
     public INode[] Content => Neurons;
 
-    public async Task Compute() {
+    public virtual async Task Compute() {
         await strategies.ComputeStrategies.ComputeLayer(strategies.ActivationStrategy, this);
     }
 
@@ -419,7 +424,7 @@ public class HiddenLayer : Layer
             double error = neuron.OutputWeights.Select(k => gradients[k.LinksTo.Id].Value * k.Value).ToArray().Fast_Sum();
 
             var hiddenGradient = new GradientAdjustment(neuron, error * strategies.ActivationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
-            hiddenGradient.AdjustWeights();
+            hiddenGradient.AdjustWeights(rate);
             hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
         });
 
@@ -438,7 +443,7 @@ public class OutputLayer : Layer
         foreach (OutputErrorAdjustment input in backPropagationInput)
         {
             var outputGradient = input.CreateOuput(this.strategies, rate);
-            outputGradient.AdjustWeights();
+            outputGradient.AdjustWeights(rate);
             gradients.Add(outputGradient);
         }
 
@@ -446,6 +451,49 @@ public class OutputLayer : Layer
         await this.InputLayer.BackPropagate(gradients.ToArray(), rate);
     }
 }
+
+public class SoftmaxLayer : Layer
+{
+    public SoftmaxLayer(ILayer inputLayer, int size, Strategies strategies)
+        : base(inputLayer, size, strategies) { }
+
+    public override async Task BackPropagate(IBackPropagationInput[] backPropagationInput, double rate)
+    {
+        // For softmax + cross entropy, the gradient for each output is (predicted - target)
+        var gradients = new List<IBackPropagationInput>();
+
+        for (int i = 0; i < this.Neurons.Length; i++)
+        {
+            var neuron = this.Neurons[i];
+            var error = backPropagationInput[i].Value;
+            var gradient = new GradientAdjustment(neuron, neuron.Value - error);
+            gradient.AdjustWeights(rate);
+            gradients.Add(gradient);
+        }
+
+        await this.InputLayer.BackPropagate(gradients.ToArray(), 1);
+    }
+
+    public override async Task Compute()
+    {
+        // First compute the raw values
+        await base.Compute();
+
+        // Apply softmax
+        double[] values = this.Neurons.Select(n => n.Value).ToArray();
+        double max = values.Max(); // For numerical stability
+        double[] exp = values.Select(v => Math.Exp(v - max)).ToArray();
+        double sum = exp.Sum();
+
+        // Update neuron values with softmax probabilities
+        for (int i = 0; i < this.Neurons.Length; i++)
+        {
+            var probability = exp[i] / sum;
+            this.Neurons[i].SetValue(probability);
+        }
+    }
+}
+
 
 /// <summary>
 /// Defines a constant value node that will receive inputs
@@ -512,6 +560,8 @@ public class Neuron: INode
 
     public double Value { get; private set;}
 
+    public void SetValue(double value) => this.Value = value;
+
     public double Bias { get; set; }    
 
     public ILayer InputLayer { get; init; }
@@ -534,33 +584,46 @@ public class OutputErrorAdjustment(Neuron Neuron, double Error) : IBackPropagati
 
     public IBackPropagationInput CreateOuput(Strategies strategies, double rate)
     {
-        return new GradientAdjustment(Neuron, Value* strategies.ActivationStrategy.ComputeActivationDerivative(Neuron.Value)*rate);
+        return new GradientAdjustment(Neuron, Neuron.Value - Error);
     }
 
-    public void AdjustWeights()
+    public void AdjustWeights(double learningRate)
     {
         throw new NotImplementedException();
     }
 
 }
 
-public class GradientAdjustment(Neuron Neuron, double Gradient) : IBackPropagationInput
+public class GradientAdjustment : IBackPropagationInput
 {
-    public INode Node => Neuron;
-    public double Value => Gradient;
-
-    public void AdjustWeights()
+    private readonly Neuron neuron;
+    private readonly double gradient;
+    private const double GradientClipValue = 1.0; // Prevent exploding gradients
+    private const double WeightRateClampLimit = 0.1;
+    public GradientAdjustment(Neuron Neuron, double Gradient)
     {
-        // Adjust Weights
-        Neuron.InputWeights.Apply(SetWeight);
-
-        // Adjust Bias
-        Neuron.Bias += Gradient;
+        neuron = Neuron;
+        gradient = Gradient.Clamp(-GradientClipValue, GradientClipValue);
     }
 
-    private void SetWeight(Weight weight)
+    public INode Node => neuron;
+    public double Value => gradient;
+
+    public void AdjustWeights(double learningRate)
     {
-        double delta = Gradient * weight.LinkedFrom.Value;
+        var clippedRate = Math. Min(0.001, learningRate);
+        // Adjust Weights
+        neuron.InputWeights.Apply((w) => SetWeight(w, learningRate));
+
+        // Adjust Bias
+        neuron.Bias += gradient;
+    }
+
+    private void SetWeight(Weight weight, double learningRate)
+    {
+        double delta = (learningRate * gradient * weight.LinkedFrom.Value)
+                            .Clamp(-WeightRateClampLimit, WeightRateClampLimit);
+
         weight.SetWeightTo(weight.Value + delta);
     }
 }

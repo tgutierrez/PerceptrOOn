@@ -10,6 +10,9 @@ namespace PerceptrOOn
     {
         public readonly Func<double[], double> GetSum;
 
+        private const double MaxValue = 100.0; // Prevent exponential overflow
+        private const double MinValue = -100.0;
+
         public DefaultComputeStrategy(bool useFastSum = true) {
             GetSum = useFastSum?
                                 (s) => s.Fast_Sum():
@@ -43,7 +46,18 @@ namespace PerceptrOOn
         }
 
         private double ComputeNeuron(IActivationStrategy strategy, Neuron neuron) {
-            return strategy.ComputeActivation(GetSum(neuron.InputWeights.Select(x => x.Compute())) + neuron.Bias);
+
+            var sum = GetSum(neuron.InputWeights.Select(x =>
+                                    x.Compute()
+                                            .CoalesceInfinite()
+                                            .Clamp(MinValue, MaxValue)
+            ));
+
+            var biasedSum = (sum + neuron.Bias).Clamp(MinValue, MaxValue);
+
+            var activatedValue = strategy.ComputeActivation(biasedSum);
+
+            return activatedValue.CoalesceInfinite();
         }
 
     }
