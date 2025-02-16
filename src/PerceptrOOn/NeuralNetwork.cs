@@ -271,6 +271,7 @@ public class NeuralNetwork
     {
         foreach (var epoch in Enumerable.Range(0, trainingParameters.Epochs))
         {
+            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Training Epoch {epoch + 1}/{trainingParameters.Epochs}");
             await TrainingEpoch(trainingParameters, epoch, trainingParameters.TrainingRate);
         }      
     }
@@ -279,7 +280,6 @@ public class NeuralNetwork
         foreach (var trainingSet in trainingParameters.TrainingDataSet)
         {
             await TrainingCycle(trainingSet, epoch, rate);
-            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Training Epoch {epoch+1}/{trainingParameters.Epochs}");
         }
     }
 

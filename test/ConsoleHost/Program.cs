@@ -18,14 +18,9 @@ using SixLabors.ImageSharp.Processing;
 internal class Program
 {
     private static Grid? SystemInfo;
-    private static Channel<string>? LogChannel;
+    private static CircularBuffer.CircularBuffer<string> LogMessages = new CircularBuffer.CircularBuffer<string>(20);
     private static async Task Main(string[] args)
     {
-        LogChannel = Channel.CreateBounded<string>(new BoundedChannelOptions(5)
-        {
-            FullMode = BoundedChannelFullMode.DropOldest
-        });
-
         NeuralNetwork? mnistNetwork = null;
         var trainingDataSet = new List<TrainingData>();
 
@@ -98,11 +93,11 @@ internal class Program
 
 
 
-            var trainingTask = ctx.AddTask("Training Network", new ProgressTaskSettings { MaxValue = trainingDataSet.Count * trainingParameters.Epochs });
+            var trainingTask = ctx.AddTask("Training Network", new ProgressTaskSettings { MaxValue = trainingParameters.Epochs });
 
            mnistNetwork = new NeuralNetwork(new NetworkDefinition(
            InputNodes: 784,
-           HiddenLayerNodeDescription: [128],
+           HiddenLayerNodeDescription: [64],
            OutputNodes: labels.Length, // Size of the label set will dictate the length
            //Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu
            //    seed: 1337,
@@ -110,9 +105,9 @@ internal class Program
            //     new DefaultComputeStrategy()
            //),
            Strategies: new Strategies(new SigmoidActivationStrategy(seed: 1337), new DefaultComputeStrategy()),
-               NotificationCallback: async (current, total, description) => { 
+               NotificationCallback: (current, total, description) => { 
                    trainingTask.Increment(1);
-                   await LogChannel.Writer.WriteAsync(description);
+                   LogMessages.PushBack($"[{DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ssZ")}] {description}");
                }
             ));
 
@@ -203,11 +198,11 @@ internal class Program
 
         static IRenderable RenderHook(IReadOnlyList<ProgressTask> tasks, IRenderable renderable)
         {
-            LogChannel!.Reader.TryRead(out string? text);
+            var rows = new Rows(LogMessages.Select(e => new Text(e, new Style(Spectre.Console.Color.Aquamarine1, Spectre.Console.Color.Black))));
 
             var header = new Panel(SystemInfo!) { Expand = true };
             var content = new Panel(renderable) { Expand = true};
-            var footer = new Panel(text ?? String.Empty) { Expand = true };
+            var footer = new Panel(rows) { Expand = true };
             return new Rows(header, content, footer);
         }
     }
