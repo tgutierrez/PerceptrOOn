@@ -59,7 +59,7 @@ public interface IActivationStrategy
     string Name { get; }
     double ComputeActivation(double input);
     double ComputeActivationDerivative (double input);
-    double GetRandomWeight();
+    double GetRandomWeight(int inputs);
     double GetInitialBias();
 }
 
@@ -90,6 +90,7 @@ public class Strategies(IActivationStrategy activationStrategy, IComputeStrategi
 
 public record NetworkDefinition(int InputNodes, int[] HiddenLayerNodeDescription, int OutputNodes, Strategies Strategies, Notify? NotificationCallback = null);
 public record TrainingData(double[] input, double[] expectedOutput);
+public record TrainingDataPreservingOriginal<T>(T Original, double[] input, double[] expectedOutput) : TrainingData(input, expectedOutput);
 public record TrainingParameters(TrainingData[] TrainingDataSet, int Epochs, double TrainingRate);
 
 #endregion
@@ -119,20 +120,18 @@ public class SigmoidActivationStrategy : IActivationStrategy
 
     public double ComputeActivationDerivative (double x) => x * (1 - x);
 
-    public double GetRandomWeight() => rand.NextDouble() *2 -1;
+    public double GetRandomWeight(int inputs) => rand.NextDouble() *2 -1;
 
-    public double GetInitialBias() => GetRandomWeight();
+    public double GetInitialBias() => 0;
 }
 
 public class ReLuActivationStrategy : IActivationStrategy
 {
-    public ReLuActivationStrategy(int? seed = default, Func<Random, double>? randomWeightExpression = null, Func<Random, double>? biasInitializationExpression = null) {
+    public ReLuActivationStrategy(int? seed = default, Func<Random, double>? biasInitializationExpression = null) {
         rand = seed.HasValue? new Random(seed.Value) : new Random();
-        this.randomWeightExpression = randomWeightExpression ?? new Func<Random, double>((r) => r.NextDouble() * 2 - 1);
-        this.getBiasInitExpression  = biasInitializationExpression ?? this.randomWeightExpression;
+        this.getBiasInitExpression  = biasInitializationExpression ?? new Func<Random, double>((r) => 0);
     }
 
-    private readonly Func<Random, double> randomWeightExpression;
     private readonly Func<Random, double> getBiasInitExpression;
 
     private readonly Random rand;
@@ -145,8 +144,19 @@ public class ReLuActivationStrategy : IActivationStrategy
         > 0 => 1,
         _ => 0,
     };
-      
-    public double GetRandomWeight() => randomWeightExpression(rand);
+
+    public double GetRandomWeight(int inputs) {
+
+        // Generate two uniform random values in (0, 1)
+        double u1 = 1.0 - rand.NextDouble();
+        double u2 = 1.0 - rand.NextDouble();
+        // Box-Muller transform to get a standard normal value (mean = 0, std = 1)
+        double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
+        // Scale by sqrt(2 / fanIn) for He initialization
+        double stdDev = Math.Sqrt(2.0 / inputs);
+        return randStdNormal * stdDev;
+
+    }
     public double GetInitialBias() => getBiasInitExpression(rand);
 }
 
@@ -269,7 +279,7 @@ public class NeuralNetwork
         foreach (var trainingSet in trainingParameters.TrainingDataSet)
         {
             await TrainingCycle(trainingSet, epoch, rate);
-            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Training Epoch {epoch+1}");
+            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Training Epoch {epoch+1}/{trainingParameters.Epochs}");
         }
     }
 
@@ -490,7 +500,7 @@ public class Neuron: INode
     {
         foreach (var input in InputLayer.Content)
         {
-            this.InputWeights.Add(new Weight(input, this, strategies.ActivationStrategy.GetRandomWeight()));
+            this.InputWeights.Add(new Weight(input, this, strategies.ActivationStrategy.GetRandomWeight(InputLayer.Content.Length)));
         }
     }
 
