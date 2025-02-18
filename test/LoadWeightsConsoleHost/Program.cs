@@ -31,7 +31,7 @@ systemInfo.AddRow("CPU Architecture", cpuInfo);
 systemInfo.AddRow("OS Info", osInfo);
 systemInfo.AddRow("Vector Hardware Support", hasVectorSupport.ToString());
 
-table.AddRow(systemInfo);
+table.AddRow(new Panel(systemInfo){ Expand = true });
 
 List<TestCase> data = null;
 
