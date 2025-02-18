@@ -70,7 +70,7 @@ namespace PerceptrOOn.Exporters
     }
 
 
-    internal record ExportableNetwork(ExportableLayer[] Layers, string ActivationStrategy, string ComputeStrategy);
+    internal record ExportableNetwork(ExportableLayer[] Layers, string ActivationStrategy, string ComputeStrategy, bool UseSoftMaxOutput = false);
 
     internal record ExportableLayer(ExportableNode[] Nodes, int LayerId);
 

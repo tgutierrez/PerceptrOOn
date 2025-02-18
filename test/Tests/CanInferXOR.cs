@@ -16,7 +16,8 @@ namespace Tests
                    InputNodes: 2,
                    HiddenLayerNodeDescription: [2, 2],
                    OutputNodes: 1,
-                   Strategies: new Strategies(new SigmoidActivationStrategy(5), new DefaultComputeStrategy())
+                   Strategies: new Strategies(new SigmoidActivationStrategy(5), new DefaultComputeStrategy()),
+                   UseSoftMaxOutput: false
                 ));
 
             var trainingParameters = new TrainingParameters(

@@ -57,6 +57,11 @@ namespace PerceptrOOn.Exporters
 
             }
 
+            if (exportableNetwork.UseSoftMaxOutput)
+            {
+                layers.Add(new SoftMaxOutputLayer(previousLayer!, previousLayer!.Size, strategies));
+            }
+
             return layers.ToArray();
         }
 

@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "test\Tests\Tests.c
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InferenceBenchmark", "test\InferenceBenchmark\InferenceBenchmark.csproj", "{62A68F00-E261-441B-833E-5FD08CD4F017}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadWeightsConsoleHost", "test\LoadWeightsConsoleHost\LoadWeightsConsoleHost.csproj", "{A9F6F45F-0FAA-4C07-A229-248A582DE045}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -37,6 +39,10 @@ Global
 		{62A68F00-E261-441B-833E-5FD08CD4F017}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{62A68F00-E261-441B-833E-5FD08CD4F017}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{62A68F00-E261-441B-833E-5FD08CD4F017}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9F6F45F-0FAA-4C07-A229-248A582DE045}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9F6F45F-0FAA-4C07-A229-248A582DE045}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9F6F45F-0FAA-4C07-A229-248A582DE045}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9F6F45F-0FAA-4C07-A229-248A582DE045}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -46,5 +52,6 @@ Global
 		{B6111BD7-2D7C-47AE-BE01-467AD535D2D4} = {C8136E25-DEDB-4514-8A47-9E79A5CF53E7}
 		{3C1DE704-A20D-44ED-BFB2-A56552123083} = {C8136E25-DEDB-4514-8A47-9E79A5CF53E7}
 		{62A68F00-E261-441B-833E-5FD08CD4F017} = {C8136E25-DEDB-4514-8A47-9E79A5CF53E7}
+		{A9F6F45F-0FAA-4C07-A229-248A582DE045} = {C8136E25-DEDB-4514-8A47-9E79A5CF53E7}
 	EndGlobalSection
 EndGlobal

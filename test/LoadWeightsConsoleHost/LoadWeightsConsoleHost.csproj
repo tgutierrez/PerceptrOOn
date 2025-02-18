@@ -23,6 +23,8 @@
 
   <ItemGroup>
     <PackageReference Include="MNIST.IO" Version="1.0.1" />
+    <PackageReference Include="Spectre.Console" Version="0.49.1" />
+    <PackageReference Include="Spectre.Console.ImageSharp" Version="0.49.1" />
   </ItemGroup>
 
   <ItemGroup>

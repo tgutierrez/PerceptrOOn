@@ -88,7 +88,7 @@ public class Strategies(IActivationStrategy activationStrategy, IComputeStrategi
     public IComputeStrategies ComputeStrategies => computeStrategies;
 };
 
-public record NetworkDefinition(int InputNodes, int[] HiddenLayerNodeDescription, int OutputNodes, Strategies Strategies, Notify? NotificationCallback = null);
+public record NetworkDefinition(int InputNodes, int[] HiddenLayerNodeDescription, int OutputNodes, Strategies Strategies, Notify? NotificationCallback = null, bool UseSoftMaxOutput = false);
 public record TrainingData(double[] input, double[] expectedOutput);
 public record TrainingDataPreservingOriginal<T>(T Original, double[] input, double[] expectedOutput) : TrainingData(input, expectedOutput);
 public record TrainingParameters(TrainingData[] TrainingDataSet, int Epochs, double TrainingRate);
@@ -110,9 +110,10 @@ public interface IBackPropagationInput {
 public class SigmoidActivationStrategy : IActivationStrategy
 {
     private Random rand; 
-
-    public SigmoidActivationStrategy(int? seed = default) {
+    private Func<Random, double> BiasInit;
+    public SigmoidActivationStrategy(int? seed = default, Func<Random, double>? biasInitialization = null) {
         rand = seed.HasValue ? new Random(seed.Value) : new Random();
+        BiasInit = biasInitialization ?? new Func<Random, double>((r) => rand.NextDouble() * 2 - 1);
     }
     public string Name => "Sigmoid";
 
@@ -122,7 +123,7 @@ public class SigmoidActivationStrategy : IActivationStrategy
 
     public double GetRandomWeight(int inputs) => rand.NextDouble() *2 -1;
 
-    public double GetInitialBias() => 0;
+    public double GetInitialBias() => BiasInit(rand);
 }
 
 public class ReLuActivationStrategy : IActivationStrategy
@@ -221,7 +222,8 @@ public class NeuralNetwork
         this.layers = layers;
         this.strategies = strategies;
         var hiddenDefinitions = HiddenLayer.ToList().Select(h => h.Neurons.Length).ToArray();
-        this.Definition = new NetworkDefinition(InputLayer.Size, hiddenDefinitions, this.OutputLayer.Size, strategies); // infer definition based on the layer structure
+        bool hasSoftMaxOutput = (layers[^1] is SoftMaxOutputLayer);
+        this.Definition = new NetworkDefinition(InputLayer.Size, hiddenDefinitions, this.OutputLayer.Size, strategies,null, hasSoftMaxOutput); // infer definition based on the layer structure
         // TODO: Validate input
     }
 
@@ -240,7 +242,13 @@ public class NeuralNetwork
             layerIndex++;
         }
 
-        layerList.Add(new OutputLayer(previousLayer, definition.OutputNodes, strategies));
+        var outputLayer = new OutputLayer(previousLayer, definition.OutputNodes, strategies);
+        layerList.Add(outputLayer);
+
+        if (definition.UseSoftMaxOutput)
+        {
+            layerList.Add(new SoftMaxOutputLayer(outputLayer, definition.OutputNodes, strategies));
+        }
 
         return layerList.ToArray();
     }
@@ -392,11 +400,11 @@ public abstract class Layer : ILayer
 
     public INode[] Content => Neurons;
 
-    public async Task Compute() {
+    public virtual async Task Compute() {
         await strategies.ComputeStrategies.ComputeLayer(strategies.ActivationStrategy, this);
     }
 
-    public double[] CollectOutput() =>
+    public virtual double[] CollectOutput() =>
         neurons.Select(w => w.Value).ToArray();
 
     public abstract Task BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient);
@@ -444,6 +452,30 @@ public class OutputLayer : Layer
 
         // Backpropagate
         await this.InputLayer.BackPropagate(gradients.ToArray(), rate);
+    }
+}
+
+public class SoftMaxOutputLayer : Layer
+{
+    public SoftMaxOutputLayer(ILayer inputLayer, int size, Strategies strategies) : base(inputLayer, size, strategies) { }
+
+    public override Task BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override Task Compute()
+    {
+        var maxValueNode = this.InputLayer.Content.Max(p => p.Value);
+        var exps = this.InputLayer.Content.Select(n => new { Node = n, Exp = Math.Exp(n.Value - maxValueNode) });
+        double sumExps = exps.Sum(s => s.Exp);
+
+        foreach (var item in exps)
+        {
+            (this.Content[item.Node.Id] as Neuron)!.SetValue(item.Exp / sumExps);
+        }
+
+        return Task.CompletedTask;
     }
 }
 
@@ -511,6 +543,8 @@ public class Neuron: INode
     public MutableArray<Weight> InputWeights { get; private set; } = new MutableArray<Weight>();
 
     public double Value { get; private set;}
+
+    public void SetValue(double value) => this.Value = value;
 
     public double Bias { get; set; }    
 
