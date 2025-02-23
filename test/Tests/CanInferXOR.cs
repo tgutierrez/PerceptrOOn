@@ -10,7 +10,7 @@ namespace Tests
         }
 
         [Test]
-        public async Task Test1()
+        public async Task StandardOutput() 
         {
             var xorNetwork = new NeuralNetwork(new NetworkDefinition(
                    InputNodes: 2,
@@ -40,5 +40,6 @@ namespace Tests
             // TODO: Asserts
             Assert.That(output, Is.EqualTo(new double[] { 0.98701988175004707d }));
         }
+
     }
 }

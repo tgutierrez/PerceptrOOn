@@ -31,30 +31,20 @@ namespace PerceptrOOn.Exporters
 
             ILayer? previousLayer = null;
             int lastLayer = exportableNetwork.Layers.Length - 1;
-            // extract output and input layer. everything in between will be considered a hidden layer.
-            for (int i = 0; i < exportableNetwork.Layers.Length; i++)
+            foreach (var deserializedLayer in exportableNetwork.Layers.OrderBy(b => b.LayerId))
             {
-
-                var deserializedLayer = exportableNetwork.Layers[i];
-
-                // check integrity by ensuring that order = id
-                if (deserializedLayer.LayerId != i) throw new InvalidOperationException($"Imported Layer Index does not matches the expected order. Found {i}, Expected {deserializedLayer.LayerId}");
-
                 ILayer? layer = null;
-                if (i == 0)
+                layer = deserializedLayer.LayerType switch
                 {
-                    layer = CreateInputLayer(deserializedLayer);
-                } else if (i == lastLayer)
-                {
-                    layer = CreateOutputLayer(deserializedLayer, previousLayer!, strategies);
-                }
-                else {
-                    layer = CreateHiddenLayer(deserializedLayer, previousLayer!, strategies)!;
-                }
+                    "InputLayer" => CreateInputLayer(deserializedLayer),
+                    "OutputLayer" => CreateOutputLayer(deserializedLayer, previousLayer!, strategies),
+                    "HiddenLayer" => CreateHiddenLayer(deserializedLayer, previousLayer!, strategies),
+                    "SoftMaxOutputLayer" => new SoftMaxOutputLayer(previousLayer!, previousLayer!.Size, strategies),
+                    _ => throw new InvalidOperationException($"Unknown Layer Type {deserializedLayer.LayerType}")
+                };
 
-                layers.Add(layer);
+                layers.Add(layer!);
                 previousLayer = layer;
-
             }
 
             if (exportableNetwork.UseSoftMaxOutput)
@@ -85,7 +75,7 @@ namespace PerceptrOOn.Exporters
             var inputWeights = new MutableArray<Weight>();
             var outputWeights = new MutableArray<Weight>();
             var current = new Neuron(strategies,
-                                                        inputWeights,  //n.Weights.Select(p => CreateWeight(n, p, previousLayer)).ToList(),
+                                                        inputWeights,  
                                                         outputWeights,
                                                         exportableNode.Bias ?? 0d,
                                                         previousLayer,

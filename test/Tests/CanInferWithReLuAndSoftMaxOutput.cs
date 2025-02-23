@@ -1,0 +1,49 @@
+﻿using PerceptrOOn;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Tests
+{
+    [TestFixture]
+    public class CanInferWithReLuAndSoftMaxOutput
+    {
+        [Test]
+        public async Task DoTest() {
+
+            var xorNetwork = new NeuralNetwork(new NetworkDefinition(
+               InputNodes: 3,
+               HiddenLayerNodeDescription: [4],
+               OutputNodes: 2,
+               Strategies: new Strategies(new ReLuActivationStrategy(0, x => 0.5, x => 0.5), new DefaultComputeStrategy()),
+               UseSoftMaxOutput: true
+            ));
+
+            var trainingParameters = new TrainingParameters(
+                    TrainingDataSet: [
+                        new TrainingData([0d, 0d, 1d], [1d, 0d]),
+                        new TrainingData([1d, 1d, 1d], [0d, 1d]),
+                        new TrainingData([1d, 0d, 1d], [0d, 1d]),
+                        new TrainingData([0d, 1d, 0d], [1d, 0d]),
+                    ],
+                    Epochs: 10000,
+                    TrainingRate: 0.01
+                );
+
+            await xorNetwork.Train(trainingParameters);
+
+            var output = await xorNetwork.Predict([0d, 0d, 0d]);
+
+            output = await xorNetwork.Predict([1d, 1d, 1d]);
+
+            output = await xorNetwork.Predict([1d, 0d, 1d]);
+
+            output = await xorNetwork.Predict([0d, 1d, 0d]);
+            // TODO: Asserts
+            //Assert.That(output, Is.EqualTo(new double[] { 0.98701988175004707d }));
+
+        }
+    }
+}

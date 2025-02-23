@@ -1,7 +1,42 @@
 ﻿using System.Numerics;
+using System.Reflection.Emit;
+using System.Security.AccessControl;
 
 namespace PerceptrOOn
 {
+    /// <summary>
+    /// Extension methods for Fluent Chaining.
+    /// </summary>
+    public static class FluentChainingExtensions
+    {
+        public static IGradientDescentInput ComputeGradientDescentWeights(this IGradientDescentInput gradientDescentInput)
+        {
+            gradientDescentInput.ComputeWeights();
+
+            return gradientDescentInput;
+        }
+
+        public static ILayer PerformGradientBackpardPass(this ILayer layer, GradientDescentAccumulator accumulator, IGradientDescentInput[] inputs)
+        {
+            if (layer is not IGradientDescentEnabledLayer)
+                throw new InvalidOperationException($"Layer {layer.GetType()} id:{layer.Id} does not supports gradient descent");
+
+            (layer as IGradientDescentEnabledLayer)!.BackpropagateGradients(accumulator, inputs);
+
+            return layer;
+        }
+
+        public static ILayer PerformGradientDescentWith(this ILayer layer, GradientDescentAccumulator accumulator)
+        {
+            if (layer is not IGradientDescentEnabledLayer)
+                throw new InvalidOperationException($"Layer {layer.GetType()} id:{layer.Id} does not supports gradient descent");
+            (layer as IGradientDescentEnabledLayer)!.PerformGradientDescent(accumulator);
+            return layer;
+        }
+    }
+    /// <summary>
+    /// Extension Methods with Utility methods
+    /// </summary>
     public static class UtilsExtentions
     {
         public static double[] ByteToFlatOutput(this byte label, int outputSize)

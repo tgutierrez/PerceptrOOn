@@ -27,14 +27,14 @@ namespace PerceptrOOn
             return Task.CompletedTask; // No awaitable code here
         }
 
-        public Task<double> ComputeNode<T>(IActivationStrategy strategy, T node) where T : INode
+        public Task<ComputeNodeOutput> ComputeNode<T>(IActivationStrategy strategy, T node) where T : INode
         {
             double value = 0;
             if (node is Neuron neuron) {
-                value = ComputeNeuron(strategy, neuron);
+                return Task.FromResult(ComputeNeuron(strategy, neuron));
             }
 
-            return Task.FromResult(value);
+            return Task.FromResult(new ComputeNodeOutput(0,0));
         }
 
         private void ComputeLayer(IActivationStrategy strategy, Layer layer)
@@ -42,8 +42,10 @@ namespace PerceptrOOn
             Parallel.ForEach(layer.Neurons, async (neuron) => { await neuron.ComputeValue(); });
         }
 
-        private double ComputeNeuron(IActivationStrategy strategy, Neuron neuron) {
-            return strategy.ComputeActivation(GetSum(neuron.InputWeights.Select(x => x.Compute())) + neuron.Bias);
+        private ComputeNodeOutput ComputeNeuron(IActivationStrategy strategy, Neuron neuron) {
+            var logit = GetSum(neuron.InputWeights.Select(x => x.Compute())) + neuron.Bias;
+            var activated = strategy.ComputeActivation(logit);
+            return new ComputeNodeOutput(activated, logit);
         }
 
     }

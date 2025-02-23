@@ -42,7 +42,7 @@ namespace PerceptrOOn.Exporters
 
                 ExportNodes(layer, exportedNodes);
 
-                exportableLayer.Add(new ExportableLayer(exportedNodes.ToArray(), layer.Id));
+                exportableLayer.Add(new ExportableLayer(exportedNodes.ToArray(), layer.Id, layer.GetLayerName()));
             }
         }
 
@@ -72,7 +72,7 @@ namespace PerceptrOOn.Exporters
 
     internal record ExportableNetwork(ExportableLayer[] Layers, string ActivationStrategy, string ComputeStrategy, bool UseSoftMaxOutput = false);
 
-    internal record ExportableLayer(ExportableNode[] Nodes, int LayerId);
+    internal record ExportableLayer(ExportableNode[] Nodes, int LayerId, string LayerType);
 
     internal record ExportableNode(ExportableWeight[] Weights, int LayerId, int NodeId, double? Bias);
 

@@ -88,7 +88,7 @@ internal class Program
             var trainingParameters = new TrainingParameters(
                     TrainingDataSet: trainingDataSet.ToArray(),
                     Epochs: 10,
-                    TrainingRate: 0.01
+                    TrainingRate: 0.001
                 );
 
 
@@ -99,12 +99,12 @@ internal class Program
            InputNodes: 784,
            HiddenLayerNodeDescription: [64],
            OutputNodes: labels.Length, // Size of the label set will dictate the length
-           //Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu
-           //    seed: 1337,
-           //    biasInitializationExpression: (r) => 0.01),
-           //     new DefaultComputeStrategy()
-           //),
-           Strategies: new Strategies(new SigmoidActivationStrategy(seed: 1337), new DefaultComputeStrategy()),
+           UseSoftMaxOutput: true,
+           Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu
+               seed: 1337),
+                new DefaultComputeStrategy()
+           ),
+               //Strategies: new Strategies(new SigmoidActivationStrategy(seed: 1337), new DefaultComputeStrategy()),
                NotificationCallback: (current, total, description) => { 
                    trainingTask.Increment(1);
                    LogMessages.PushBack($"[{DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ssZ")}] {description}");
