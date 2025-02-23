@@ -6,11 +6,14 @@ using System.Security.Cryptography;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 public interface ILayer {
+    
     int Id { get; }
     int Size { get; }
     double Loss { get; }
 
     INode[] Content {  get; }
+
+    string GetLayerName();
 
     Task BackPropagate(IBackPropagationInput[] backPropagationInput, double rate);
 }
@@ -200,8 +203,6 @@ public static class ActivationStrategyFactory {
         };
 }
 
-
-
 public static class ComputeStrategyFactory {
     public static IComputeStrategies Create(string name, int? seed = default)
     => name switch
@@ -310,8 +311,9 @@ public class NeuralNetwork
     {
         foreach (var epoch in Enumerable.Range(0, trainingParameters.Epochs))
         {
+            CumulativeLoss = 0;
             await TrainingEpoch(trainingParameters, epoch, trainingParameters.TrainingRate);
-            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Finished Training Epoch {epoch + 1}/{trainingParameters.Epochs} - Loss: {OutputLayer.Loss}");
+            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Finished Training Epoch {epoch + 1}/{trainingParameters.Epochs} - Loss: {CumulativeLoss}");
         }      
     }
 
@@ -319,6 +321,7 @@ public class NeuralNetwork
         foreach (var trainingSet in trainingParameters.TrainingDataSet)
         {
             await TrainingCycle(trainingSet, epoch, rate);
+            CumulativeLoss += OutputLayer.Loss / trainingParameters.TrainingDataSet.Length;
         }
     }
 
@@ -391,6 +394,8 @@ public class InputLayer : ILayer, IGradientDescentEnabledLayer
 
     public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerGradients) { } // No backpropagation on input layer
     public void PerformGradientDescent(GradientDescentAccumulator accumulator) { } // No gradient descent on input layer
+
+    public string GetLayerName() => "InputLayer";
 }
 
 
@@ -460,6 +465,7 @@ public abstract class Layer : ILayer
         }
     }
 
+    public abstract string GetLayerName();
 }
 
 public class HiddenLayer : Layer, IGradientDescentEnabledLayer
@@ -497,6 +503,8 @@ public class HiddenLayer : Layer, IGradientDescentEnabledLayer
 
         this.InputLayer.PerformGradientBackpardPass(accumulator, previousLayerInput);
     }
+
+    public override string GetLayerName() => "HiddenLayer";
 }
 
 
@@ -534,7 +542,7 @@ public class OutputLayer : Layer, IOutputLayer, IGradientDescentEnabledLayer
 
         this.InputLayer.PerformGradientBackpardPass(accumulator, gradients);
     }
-
+    public override string GetLayerName() => "OutputLayer";
     public Task ComputeLoss(double[] expectedOutput) => Task.CompletedTask;
 }
 
@@ -594,6 +602,8 @@ public class SoftMaxOutputLayer : Layer, IOutputLayer
     {
         throw new NotImplementedException();
     }
+
+    public override string GetLayerName() => "SoftMaxOutputLayer";
 }
 
 /// <summary>
