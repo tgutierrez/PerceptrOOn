@@ -2,9 +2,11 @@
 
 using PerceptrOOn;
 using System.Collections.Concurrent;
-using System.Security.Cryptography;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Runtime.InteropServices;
 
+public static class Globals {
+        public static ParallelOptions DefaultParallelOptions = new ParallelOptions { MaxDegreeOfParallelism = -1 };
+}
 public interface ILayer {
     
     int Id { get; }
@@ -21,8 +23,8 @@ public interface ILayer {
 
 public interface IGradientDescentEnabledLayer
 {
-    public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerGradients);
-    public void PerformGradientDescent(GradientDescentAccumulator accumulator);
+    public void BackpropagateGradients(IPreviousLayerGradientDescentContainer accumulator);
+    public void PerformGradientDescent(IGradientDescentAccumulator accumulator);
 }
 
 public interface IOutputLayer : ILayer
@@ -42,11 +44,28 @@ public interface INode
 
     public Task ComputeValue();
 
-    public MutableArray<Weight> OutputWeights { get; }
+    public List<Weight> OutputWeights { get; }
 
-    public MutableArray<Weight> InputWeights { get; }
+    public List<Weight> InputWeights { get; }
 
 }
+
+public interface IGradientDescentAccumulator
+{
+    Dictionary<int, IEnumerable<IGradientDescentInput>> Gradients { get; }
+    double LeariningRate { get; }
+
+    void Add(ILayer layer, IEnumerable<IGradientDescentInput> gradientDescentInputs);
+}
+
+public interface IPreviousLayerGradientDescentContainer : IGradientDescentAccumulator
+{
+    List<IGradientDescentInput> PreviousLayerGradientDescent { get; }
+
+    void AddCurrentAsPreviousLayer(IGradientDescentInput[] gradientDescentInputs);
+    void AddCurrentAsPreviousLayer(List<IGradientDescentInput> gradientDescentInputs);
+}
+
 
 public class Weight
 {
@@ -66,7 +85,7 @@ public class Weight
     public INode LinksTo => linksTo;
 
     public double Value { get; private set; }
-
+    public double Gradient { get; private set; }
     public double Compute()
     {
         return Value * LinkedFrom.Value;
@@ -76,13 +95,11 @@ public class Weight
     {
         Value = value;
     }
+    public void SetGradient(double gradient)
+    {
+        Gradient = gradient;
+    }
 };
-
-public class WeightGradient(Weight weight, double gradient)
-{
-    public Weight Weight => weight;
-    public double Gradient => gradient;
-}
 
 public interface IActivationStrategy
 {
@@ -123,7 +140,7 @@ public record TrainingData(double[] input, double[] expectedOutput);
 public record TrainingDataPreservingOriginal<T>(T Original, double[] input, double[] expectedOutput) : TrainingData(input, expectedOutput);
 public record TrainingParameters(TrainingData[] TrainingDataSet, int Epochs, double TrainingRate);
 
-public record ComputeNodeOutput(double Activated, double Logit);
+public record struct ComputeNodeOutput(double Activated, double Logit);
 
 #endregion
 
@@ -141,7 +158,7 @@ public interface IBackPropagationInput {
 
 public interface IGradientDescentInput : IBackPropagationInput // "Marker" interface for proper method assignment
 {
-    public WeightGradient[] WeightGradients { get; }
+    public List<Weight> WeightGradients { get; }
     double BiasGradient { get; }
 }
 
@@ -256,7 +273,6 @@ public class NeuralNetwork
         var hiddenDefinitions = HiddenLayer.ToList().Select(h => h.Neurons.Length).ToArray();
         bool hasSoftMaxOutput = (layers[^1] is SoftMaxOutputLayer);
         this.Definition = new NetworkDefinition(InputLayer.Size, hiddenDefinitions, this.OutputLayer.Size, strategies,null, hasSoftMaxOutput); // infer definition based on the layer structure
-        // TODO: Validate input
     }
 
     private ILayer[] BuildLayers(NetworkDefinition definition)
@@ -392,8 +408,8 @@ public class InputLayer : ILayer, IGradientDescentEnabledLayer
 
     public Task BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient) => Task.CompletedTask;
 
-    public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerGradients) { } // No backpropagation on input layer
-    public void PerformGradientDescent(GradientDescentAccumulator accumulator) { } // No gradient descent on input layer
+    public void BackpropagateGradients(IPreviousLayerGradientDescentContainer accumulator) { } // No backpropagation on input layer
+    public void PerformGradientDescent(IGradientDescentAccumulator accumulator) { } // No gradient descent on input layer
 
     public string GetLayerName() => "InputLayer";
 }
@@ -452,7 +468,7 @@ public abstract class Layer : ILayer
 
     public abstract Task BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient);
 
-    public void PerformGradientDescent(GradientDescentAccumulator accumulator)
+    public void PerformGradientDescent(IGradientDescentAccumulator accumulator)
     {
         foreach (var gradient in accumulator.Gradients[Id])
         {
@@ -460,7 +476,7 @@ public abstract class Layer : ILayer
             neuron.Bias -= gradient.BiasGradient * accumulator.LeariningRate;
             foreach (var weightGradient in gradient.WeightGradients)
             {
-                weightGradient.Weight.SetWeightTo(weightGradient.Weight.Value - (weightGradient.Gradient * accumulator.LeariningRate));
+                weightGradient.SetWeightTo(weightGradient.Value - (weightGradient.Gradient * accumulator.LeariningRate));
             }
         }
     }
@@ -472,12 +488,45 @@ public class HiddenLayer : Layer, IGradientDescentEnabledLayer
 {
     public HiddenLayer(ILayer inputLayer, int size, Strategies strategies) : base(inputLayer, size, strategies) { }
     public HiddenLayer(Neuron[] neurons, Strategies strategies, ILayer inputLayer, int id)  : base(neurons, strategies, inputLayer, id) { }
-    public override async Task BackPropagate(IBackPropagationInput[] gradients, double rate) 
+
+    public override async Task BackPropagate(IBackPropagationInput[] gradients, double rate)
+    {
+        if (Globals.DefaultParallelOptions.MaxDegreeOfParallelism != 1)
+        {
+            await CalculateBackPropagateUsingParallelism(gradients, rate);
+            return;
+        }
+
+        await CalculateBackPropagateUsingSequential(gradients, rate);
+    }
+
+    private async Task CalculateBackPropagateUsingSequential(IBackPropagationInput[] gradients, double rate)
+    {
+        var hiddenGradients = new List<Tuple<int, GradientAdjustment>>();
+        var neurons = this.Neurons;
+
+        for(int i = 0; i < neurons.Length; i++)
+        {
+            var neuron = neurons[i];
+
+            double error = neuron.OutputWeights.Select(k => gradients[k.LinksTo.Id].Value * k.Value).ToArray().Fast_Sum();
+
+            var hiddenGradient = new GradientAdjustment(neuron, error * strategies.ActivationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
+            hiddenGradient.ComputeWeights();
+            hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
+        };
+
+        await this.InputLayer.BackPropagate(hiddenGradients.OrderBy(t => t.Item1).Select(v => v.Item2).ToArray(), rate); // Ensure results are ordered, since gradients were calculated in parallel.
+    }
+
+    private async Task CalculateBackPropagateUsingParallelism(IBackPropagationInput[] gradients, double rate)
     {
         var hiddenGradients = new ConcurrentBag<Tuple<int, GradientAdjustment>>();
         var neurons = this.Neurons;
 
-        Parallel.ForEach(Enumerable.Range(0, neurons.Length), (i) =>    // Use the input length to create parallel tasks 
+        Parallel.ForEach(Enumerable.Range(0, neurons.Length),
+            Globals.DefaultParallelOptions
+            , (i) =>    // Use the input length to create parallel tasks 
         {
             var neuron = neurons[i];
 
@@ -491,17 +540,23 @@ public class HiddenLayer : Layer, IGradientDescentEnabledLayer
         await this.InputLayer.BackPropagate(hiddenGradients.OrderBy(t => t.Item1).Select(v => v.Item2).ToArray(), rate); // Ensure results are ordered, since gradients were calculated in parallel.
     }
 
-    public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerInput)
+    public void BackpropagateGradients(IPreviousLayerGradientDescentContainer accumulator)
     {
-        var gradients = this.Neurons
-            .Select(n => {
-                var errorSum = n.OutputWeights.Select(w => w.Value * previousLayerInput[w.LinksTo.Id].Value).Fast_Sum();
-                return new HiddenGradientDescentInput(n, errorSum * strategies.ActivationStrategy.ComputeActivation(n.Logit)).ComputeGradientDescentWeights();
-                } ).OrderBy(b => b.Node.Id).ToArray(); // Ensure results are ordered, in case we want to get fancy with parallel stuff
+        var previousLayerInput = accumulator.PreviousLayerGradientDescent;
+        var gradients = new IGradientDescentInput[this.Neurons.Length];
+        foreach (var neuron in this.Neurons)
+        {
+            var errorSum = 0d;
+            foreach (var outputWeight in neuron.OutputWeights)
+            {
+                errorSum += outputWeight.Value * previousLayerInput[outputWeight.LinksTo.Id].Value;
+            }
+            gradients[neuron.Id] = new HiddenGradientDescentInput(neuron, errorSum * strategies.ActivationStrategy.ComputeActivationDerivative(neuron.Logit)).ComputeGradientDescentWeights();
+        }
 
         accumulator.Add(this, gradients);
 
-        this.InputLayer.PerformGradientBackpardPass(accumulator, previousLayerInput);
+        this.InputLayer.PerformGradientBackwardPass(accumulator, gradients);
     }
 
     public override string GetLayerName() => "HiddenLayer";
@@ -531,17 +586,21 @@ public class OutputLayer : Layer, IOutputLayer, IGradientDescentEnabledLayer
                         .Index()
                         .Select((e) => new OutputErrorAdjustment(e.Item, trainingData.expectedOutput[e.Index])).ToArray());
 
-    public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerInput)
+    public void BackpropagateGradients(IPreviousLayerGradientDescentContainer accumulator)
     {
-        var gradients = this.Neurons
-                            .Select(n => new OutputGradientDescentAdjustment(n, previousLayerInput[n.Id].Value)
-                                                .ComputeGradientDescentWeights())
-                            .OrderBy(n => n.Node.Id)
-                            .ToArray();
+        var previousLayerInput = accumulator.PreviousLayerGradientDescent;
+        var gradients = new IGradientDescentInput[this.Neurons.Length];
+        foreach (var neuron in this.Neurons)
+        {
+            gradients[neuron.Id] = new OutputGradientDescentAdjustment(neuron, previousLayerInput[neuron.Id].Value)
+                                            .ComputeGradientDescentWeights();
+        }
+
         accumulator.Add(this, gradients);
 
-        this.InputLayer.PerformGradientBackpardPass(accumulator, gradients);
+        this.InputLayer.PerformGradientBackwardPass(accumulator, gradients);
     }
+
     public override string GetLayerName() => "OutputLayer";
     public Task ComputeLoss(double[] expectedOutput) => Task.CompletedTask;
 }
@@ -563,23 +622,33 @@ public class SoftMaxOutputLayer : Layer, IOutputLayer
         return Task.CompletedTask;
     }
 
-    public override async Task BackPropagate(IBackPropagationInput[] backPropagationInput, double rate)
+    public override Task BackPropagate(IBackPropagationInput[] backPropagationInput, double rate)
     {
         var gradientInputs = backPropagationInput.Cast<IGradientDescentInput>().ToArray();
         // Backpropagate
-        var accumulator = new GradientDescentAccumulator(this.strategies, rate); // Starts new Accumulator
+        var accumulator = new GradientDescentAccumulator(rate); // Starts new Accumulator
         accumulator.Add(this, gradientInputs);
 
-        this.InputLayer.PerformGradientBackpardPass( accumulator, gradientInputs);
+        this.InputLayer.PerformGradientBackwardPass(accumulator, gradientInputs);
         // After the backpropagation, we can perform the gradient descent
         this.InputLayer.PerformGradientDescentWith(accumulator);
+
+        accumulator = null;
+
+        return Task.CompletedTask;
     }
 
     public override Task Compute()
     {
-        var maxValueNode = this.InputLayer.Content.Max(p => p.Value);
-        var exps = this.InputLayer.Content.Select(n => new { Node = n, Exp = Math.Exp((n as Neuron)!.Logit - maxValueNode) });
-        double sumExps = exps.Sum(s => s.Exp);
+        var maxValueNode = this.InputLayer.Content.Select(n => n.Value).Max();
+        var exps = new List<(INode Node, double Exp)>();
+        var sumExps = 0d;
+        foreach (var content in this.InputLayer.Content)
+        {
+            var exp = Math.Exp((content as Neuron)!.Logit - maxValueNode);
+            exps.Add((Node: content, Exp: exp));
+            sumExps += exp;
+        }
 
         foreach (var item in exps)
         {
@@ -589,13 +658,13 @@ public class SoftMaxOutputLayer : Layer, IOutputLayer
         return Task.CompletedTask;
     }
 
-    public async Task<IBackPropagationInput[]> CreateBackPropagationInputFromExpected(TrainingData trainingData)
+    public Task<IBackPropagationInput[]> CreateBackPropagationInputFromExpected(TrainingData trainingData)
     {
         var errors = this.Neurons
             .Index()
-            .Select((e) => new SoftMaxErrorAdjustment(e.Item, trainingData.expectedOutput[e.Index])).ToArray();
+            .Select((e) => (IBackPropagationInput)(new SoftMaxErrorAdjustment(e.Item, trainingData.expectedOutput[e.Index]))).ToArray();
 
-        return errors;
+        return Task.FromResult(errors);
     }
 
     public void ComputeLoss()
@@ -615,9 +684,9 @@ public class InputNode(int id) : INode
     public int Id => id;
     public double Value { get; private set; }
 
-    public MutableArray<Weight> OutputWeights { get; private set; } = new MutableArray<Weight>();
+    public List<Weight> OutputWeights { get; private set; } = new List<Weight>();
 
-    public MutableArray<Weight> InputWeights { get; private set; } = new MutableArray<Weight>();
+    public List<Weight> InputWeights { get; private set; } = new List<Weight>();
 
     public Task ComputeValue() => Task.CompletedTask;
 
@@ -645,7 +714,7 @@ public class Neuron: INode
         Bias = strategies.ActivationStrategy.GetInitialBias();
     }
 
-    public Neuron(Strategies strategies, MutableArray<Weight> inputWeights, MutableArray<Weight> outputWeights, double bias, ILayer inputLayer, int id)
+    public Neuron(Strategies strategies, List<Weight> inputWeights, List<Weight> outputWeights, double bias, ILayer inputLayer, int id)
     {
         this.strategies = strategies;
         InputWeights = inputWeights;
@@ -669,9 +738,9 @@ public class Neuron: INode
         this.Logit = result.Logit;
     }
 
-    public MutableArray<Weight> OutputWeights { get; private set; } = new MutableArray<Weight>();
+    public List<Weight> OutputWeights { get; private set; } = new List<Weight>();
 
-    public MutableArray<Weight> InputWeights { get; private set; } = new MutableArray<Weight>();
+    public List<Weight> InputWeights { get; private set; } = new List<Weight>();
 
     public double Value { get; private set;}
 
@@ -731,12 +800,17 @@ public class HiddenGradientDescentInput(Neuron neuron, double gradient) : IGradi
 
     public double BiasGradient { get; private set; }
 
-    public WeightGradient[] WeightGradients { get; private set; } = Array.Empty<WeightGradient>();
+    public List<Weight> WeightGradients { get; private set; } = new List<Weight>();
 
     public void ComputeWeights()
     {
         BiasGradient = gradient;
-        WeightGradients = neuron.InputWeights.Select(n => new WeightGradient(n, gradient * n.LinkedFrom.Value)).ToArray();
+        //WeightGradients = neuron.InputWeights.Select(n => new WeightGradient(n, gradient * n.LinkedFrom.Value)).ToList();
+        foreach (var weight in neuron.InputWeights)
+        {
+            weight.SetGradient(gradient * weight.LinkedFrom.Value);
+            WeightGradients.Add(weight);
+        }
     }
 
     public IBackPropagationInput CreateBackPropagationInput(Strategies strategies, double rate)
@@ -773,7 +847,7 @@ public class SoftMaxErrorAdjustment : IGradientDescentInput
     {
         throw new NotSupportedException();
     }
-    public WeightGradient[] WeightGradients { get; private set; } = Array.Empty<WeightGradient>();
+    public List<Weight> WeightGradients { get; private set; } = new List<Weight>();
 
     public double SampleLoss() => expectedValue * Math.Log(neuron.Value) + 1e-8; // Avoids Log(0)
 
@@ -787,12 +861,17 @@ public class OutputGradientDescentAdjustment(Neuron neuron, double gradient) : I
 
     public double BiasGradient {  get; private set; }
 
-    public WeightGradient[] WeightGradients {  get; private set; } = Array.Empty<WeightGradient>();
+    public List<Weight> WeightGradients { get; private set; } = new List<Weight>();
 
     public void ComputeWeights()
     {
         BiasGradient = gradient;
-        WeightGradients = neuron.InputWeights.Select(n => new WeightGradient(n, gradient * n.LinkedFrom.Value)).ToArray();
+        //WeightGradients = neuron.InputWeights.Select(n => new WeightGradient(n, gradient * n.LinkedFrom.Value)).ToList();
+        foreach (var weight in neuron.InputWeights)
+        {
+            weight.SetGradient(gradient * weight.LinkedFrom.Value);
+            WeightGradients.Add(weight);
+        }
     }
 
     public IBackPropagationInput CreateBackPropagationInput(Strategies strategies, double rate)
@@ -829,16 +908,45 @@ public class GradientAdjustment(Neuron Neuron, double Gradient) : IBackPropagati
 }
 
 
-public class GradientDescentAccumulator(Strategies strategies, double learningRate)
+public class GradientDescentAccumulator(double learningRate) : IDisposable, IGradientDescentAccumulator, IPreviousLayerGradientDescentContainer
 {
     public double LeariningRate => learningRate;
-    public Strategies Strategies => strategies;
 
-    public Dictionary<int, IGradientDescentInput[]> Gradients { get; internal set; } = new Dictionary<int, IGradientDescentInput[]>();
+    public Dictionary<int, IEnumerable<IGradientDescentInput>> Gradients { get; internal set; } = new Dictionary<int, IEnumerable<IGradientDescentInput>> ();
 
-    public void Add(ILayer layer, IGradientDescentInput[] gradientDescentInputs)
+    public List<IGradientDescentInput> PreviousLayerGradientDescent { get; internal set; } = new List<IGradientDescentInput>();
+
+    public void Add(ILayer layer, IEnumerable<IGradientDescentInput> gradientDescentInputs)
     {
         this.Gradients.Add(layer.Id, gradientDescentInputs);
+    }
+
+    public void AddCurrentAsPreviousLayer(IGradientDescentInput[] gradientDescentInputs)
+    {
+        PreviousLayerGradientDescent.Clear();
+        PreviousLayerGradientDescent.AddRange(gradientDescentInputs.AsSpan());
+    }
+
+    public void AddCurrentAsPreviousLayer(List<IGradientDescentInput> gradientDescentInputs)
+    {
+        PreviousLayerGradientDescent.Clear();
+        PreviousLayerGradientDescent.AddRange(CollectionsMarshal.AsSpan(gradientDescentInputs));
+    }
+
+    public void Dispose()
+    {
+        Gradients.Clear();
+        Gradients = null!;
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Gradients.Clear();
+            Gradients = null!;
+        }
     }
 }
 

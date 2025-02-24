@@ -8,9 +8,9 @@ namespace PerceptrOOn
 {
     public class DefaultComputeStrategy: IComputeStrategies
     {
-        public readonly Func<double[], double> GetSum;
+        public readonly Func<IEnumerable<double>, double> GetSum;
 
-        public DefaultComputeStrategy(bool useFastSum = true) {
+        public DefaultComputeStrategy(bool useFastSum = false) {
             GetSum = useFastSum?
                                 (s) => s.Fast_Sum():
                                 (s) => s.Sum();
@@ -29,7 +29,6 @@ namespace PerceptrOOn
 
         public Task<ComputeNodeOutput> ComputeNode<T>(IActivationStrategy strategy, T node) where T : INode
         {
-            double value = 0;
             if (node is Neuron neuron) {
                 return Task.FromResult(ComputeNeuron(strategy, neuron));
             }
@@ -43,7 +42,15 @@ namespace PerceptrOOn
         }
 
         private ComputeNodeOutput ComputeNeuron(IActivationStrategy strategy, Neuron neuron) {
-            var logit = GetSum(neuron.InputWeights.Select(x => x.Compute())) + neuron.Bias;
+
+            var sum = 0d;  
+
+            for (int i = 0; i < neuron.InputWeights.Count; i++)
+            {
+                sum += neuron.InputWeights[i].Compute();
+            }
+
+            var logit = sum + neuron.Bias;
             var activated = strategy.ComputeActivation(logit);
             return new ComputeNodeOutput(activated, logit);
         }

@@ -12,10 +12,10 @@ namespace Tests
     {
         [Test]
         public async Task DoTest() {
-
+            Globals.DefaultParallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 1 };
             var xorNetwork = new NeuralNetwork(new NetworkDefinition(
                InputNodes: 3,
-               HiddenLayerNodeDescription: [4],
+               HiddenLayerNodeDescription: [128, 64],
                OutputNodes: 2,
                Strategies: new Strategies(new ReLuActivationStrategy(0, x => 0.5, x => 0.5), new DefaultComputeStrategy()),
                UseSoftMaxOutput: true
@@ -38,9 +38,20 @@ namespace Tests
 
             output = await xorNetwork.Predict([1d, 1d, 1d]);
 
+            Assert.That(output[0], Is.LessThan(0.1));
+            Assert.That(output[1], Is.GreaterThan(0.9));
+
             output = await xorNetwork.Predict([1d, 0d, 1d]);
 
+            Assert.That(output[0], Is.LessThan(0.1));
+            Assert.That(output[1], Is.GreaterThan(0.9));
+
             output = await xorNetwork.Predict([0d, 1d, 0d]);
+
+            Assert.That(output[0], Is.GreaterThan(0.9));
+            Assert.That(output[1], Is.LessThan(0.1));
+            
+
             // TODO: Asserts
             //Assert.That(output, Is.EqualTo(new double[] { 0.98701988175004707d }));
 

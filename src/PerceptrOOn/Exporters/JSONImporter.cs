@@ -72,8 +72,8 @@ namespace PerceptrOOn.Exporters
 
         private static Neuron CreateNeuron(ILayer previousLayer, Strategies strategies, ExportableNode exportableNode)
         {
-            var inputWeights = new MutableArray<Weight>();
-            var outputWeights = new MutableArray<Weight>();
+            var inputWeights = new List<Weight>();
+            var outputWeights = new List<Weight>();
             var current = new Neuron(strategies,
                                                         inputWeights,  
                                                         outputWeights,
