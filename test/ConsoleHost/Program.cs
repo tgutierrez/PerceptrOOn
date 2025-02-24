@@ -14,19 +14,20 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Channels;
 using SixLabors.ImageSharp.Processing;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
-internal class Program
+internal class Program1
 {
     private static Grid? SystemInfo;
     private static CircularBuffer.CircularBuffer<string> LogMessages = new CircularBuffer.CircularBuffer<string>(20);
-    private static async Task Main(string[] args)
+    private static async Task Main1(string[] args)
     {
         NeuralNetwork? mnistNetwork = null;
         var trainingDataSet = new List<TrainingData>();
 
 
-        //var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
-        var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // Uncomment to train full. Warning, 30 epochs, on a Ryzen7700 takes +/- 1-2m
+        var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
+        //var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // Uncomment to train full. Warning, 30 epochs, on a Ryzen7700 takes +/- 1-2m
 
         var cpuInfo = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString();
         var osInfo = System.Runtime.InteropServices.RuntimeInformation.OSDescription.ToString();
@@ -228,5 +229,51 @@ internal class Program
         return image;
     }
 
+
+    private static async Task Main(string[] args)
+    {
+        var trainingDataSet = new List<TrainingData>();
+        var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
+        var data = FileReaderMNIST.LoadImagesAndLables(
+             @"Assets/train-labels-idx1-ubyte.gz"
+            , @"Assets/train-images-idx3-ubyte.gz"
+        ).ToList();
+
+        data = data.Where(z => labels.Any(l => l == z!.Label)).ToList();
+
+        var dataAsSpan = data.ToArray().AsSpan();
+
+        // Randomize set
+        new Random().Shuffle(dataAsSpan);
+
+        data = dataAsSpan.ToArray().ToList();
+        foreach (var node in data)
+        {
+            trainingDataSet.Add(new TrainingDataPreservingOriginal<TestCase>(node!, node!.Image.Flatten2DMatrix(), node.Label.ByteToFlatOutput(labels.Length)));
+        }
+
+        var trainingParameters = new TrainingParameters(
+            TrainingDataSet: trainingDataSet.ToArray(),
+            Epochs: 10,
+            TrainingRate: 0.001
+        );
+
+        var mnistNetwork = new NeuralNetwork(new NetworkDefinition(
+           InputNodes: 784,
+           HiddenLayerNodeDescription: [64],
+           OutputNodes: labels.Length, // Size of the label set will dictate the length
+           UseSoftMaxOutput: true,
+           Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu
+               seed: 1337),
+                new DefaultComputeStrategy()
+           ),
+               //Strategies: new Strategies(new SigmoidActivationStrategy(seed: 1337), new DefaultComputeStrategy()),
+               NotificationCallback: (current, total, description) => {
+                   Console.WriteLine($"[{DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ssZ")}] {description}");
+               }
+            ));
+
+        await mnistNetwork.Train(trainingParameters);
+    }
 
 }

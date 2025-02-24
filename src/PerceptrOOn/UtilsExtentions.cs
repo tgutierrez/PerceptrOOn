@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Collections;
+using System.Numerics;
 using System.Reflection.Emit;
 using System.Security.AccessControl;
 
@@ -16,12 +17,12 @@ namespace PerceptrOOn
             return gradientDescentInput;
         }
 
-        public static ILayer PerformGradientBackpardPass(this ILayer layer, GradientDescentAccumulator accumulator, IGradientDescentInput[] inputs)
+        public static ILayer PerformGradientBackwardPass(this ILayer layer,ref GradientDescentAccumulator accumulator,ref IGradientDescentInput[] inputs)
         {
             if (layer is not IGradientDescentEnabledLayer)
                 throw new InvalidOperationException($"Layer {layer.GetType()} id:{layer.Id} does not supports gradient descent");
 
-            (layer as IGradientDescentEnabledLayer)!.BackpropagateGradients(accumulator, inputs);
+            (layer as IGradientDescentEnabledLayer)!.BackpropagateGradients(ref accumulator,ref inputs);
 
             return layer;
         }
@@ -30,7 +31,7 @@ namespace PerceptrOOn
         {
             if (layer is not IGradientDescentEnabledLayer)
                 throw new InvalidOperationException($"Layer {layer.GetType()} id:{layer.Id} does not supports gradient descent");
-            (layer as IGradientDescentEnabledLayer)!.PerformGradientDescent(accumulator);
+            (layer as IGradientDescentEnabledLayer)!.PerformGradientDescent(ref accumulator);
             return layer;
         }
     }
@@ -59,32 +60,39 @@ namespace PerceptrOOn
 
         public static double Normalize(this byte input) => input / 255d;
 
+        public static void Apply<T>(this IEnumerable<T> items, Action<T> action)
+        {
+            foreach (var item in items)
+            {
+                action(item);
+            }
+        }
+
         #region Fast Sum Methods. Lifted from https://github.com/DragonSpit/HPCsharp/blob/81837935698a8b1d412ee6de8a5f04b04a721838/HPCsharp/SumParallel.cs
 
-        // All Credits to https://github.com/DragonSpit/HPCsharp (C) Victor J. Duvanenko.
+            // All Credits to https://github.com/DragonSpit/HPCsharp (C) Victor J. Duvanenko.
 
-        /// <summary>
-        /// If hardware support is available, it will route the sum method to the fast version
-        /// </summary>
-        /// <remarks>
-        /// only x86 is supported at this moment.
-        /// </remarks>
-        /// <param name="array"></param>
-        /// <returns></returns>
-        public static double Fast_Sum(this double[] array) =>
-            Vector.IsHardwareAccelerated ? array.SumSse() :              
-            array.Sum();
+            /// <summary>
+            /// If hardware support is available, it will route the sum method to the fast version
+            /// </summary>
+            /// <remarks>
+            /// only x86 is supported at this moment.
+            /// </remarks>
+            /// <param name="array"></param>
+            /// <returns></returns>
+        public static double Fast_Sum(this IEnumerable<double> array) =>
+            Vector.IsHardwareAccelerated ? array.SumSse() : array.Sum();
 
         /// <summary>
         /// Summation of double[] array, using data parallel SIMD/SSE instructions for higher performance on a single core.
         /// </summary>
         /// <param name="arrayToSum">An array to sum up</param>
         /// <returns>double sum</returns>
-        public static double SumSse(this double[] arrayToSum)
+        public static double SumSse(this IEnumerable<double> arrayToSum)
         {
             if (arrayToSum == null)
                 throw new ArgumentNullException(nameof(arrayToSum));
-            return arrayToSum.SumSseInner(0, arrayToSum.Length - 1);
+            return arrayToSum.SumSseInner(0, arrayToSum.Count() - 1);
         }
 
         /// <summary>
@@ -95,26 +103,27 @@ namespace PerceptrOOn
         /// <param name="length">number of array elements to sum up</param>
         /// <returns>double sum</returns>
 
-        public static double SumSse(this double[] arrayToSum, int startIndex, int length)
+        public static double SumSse(this IEnumerable<double> arrayToSum, int startIndex, int length)
         {
             if (arrayToSum == null)
                 throw new ArgumentNullException(nameof(arrayToSum));
             return arrayToSum.SumSseInner(startIndex, startIndex + length - 1);
         }
 
-        private static double SumSseInner(this double[] arrayToSum, int l, int r)
+        private static double SumSseInner(this IEnumerable<double> arrayToSum, int l, int r)
         {
             var sumVector = new Vector<double>();
+            var arrayToSumAsArray = arrayToSum.ToArray();
             int sseIndexEnd = l + ((r - l + 1) / Vector<double>.Count) * Vector<double>.Count;
             int i;
             for (i = l; i < sseIndexEnd; i += Vector<double>.Count)
             {
-                var inVector = new Vector<double>(arrayToSum, i);
+                var inVector = new Vector<double>(arrayToSumAsArray, i);
                 sumVector += inVector;
             }
             double overallSum = 0;
             for (; i <= r; i++)
-                overallSum += arrayToSum[i];
+                overallSum += arrayToSumAsArray[i];
             for (i = 0; i < Vector<double>.Count; i++)
                 overallSum += sumVector[i];
             return overallSum;
@@ -132,6 +141,7 @@ namespace PerceptrOOn
     /// Add is expensive!
     /// </remarks>
     /// <typeparam name="T"></typeparam>
+    [Obsolete]
     public class MutableArray<T>
     {
         public MutableArray() { }
