@@ -16,12 +16,13 @@ using System.Threading.Channels;
 using SixLabors.ImageSharp.Processing;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
-internal class Program1
+internal class Program
 {
     private static Grid? SystemInfo;
     private static CircularBuffer.CircularBuffer<string> LogMessages = new CircularBuffer.CircularBuffer<string>(20);
-    private static async Task Main1(string[] args)
+    private static async Task Main(string[] args)
     {
+        Globals.DefaultParallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 1 };
         NeuralNetwork? mnistNetwork = null;
         var trainingDataSet = new List<TrainingData>();
 
@@ -230,8 +231,10 @@ internal class Program1
     }
 
 
-    private static async Task Main(string[] args)
+    private static async Task Main1(string[] args)
     {
+        Globals.DefaultParallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 1 };
+
         var trainingDataSet = new List<TrainingData>();
         var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
         var data = FileReaderMNIST.LoadImagesAndLables(
@@ -260,7 +263,7 @@ internal class Program1
 
         var mnistNetwork = new NeuralNetwork(new NetworkDefinition(
            InputNodes: 784,
-           HiddenLayerNodeDescription: [64],
+           HiddenLayerNodeDescription: [128],
            OutputNodes: labels.Length, // Size of the label set will dictate the length
            UseSoftMaxOutput: true,
            Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu

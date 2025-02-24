@@ -4,6 +4,9 @@ using PerceptrOOn;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 
+public static class Globals {
+        public static ParallelOptions DefaultParallelOptions = new ParallelOptions { MaxDegreeOfParallelism = -1 };
+}
 public interface ILayer {
     
     int Id { get; }
@@ -20,8 +23,8 @@ public interface ILayer {
 
 public interface IGradientDescentEnabledLayer
 {
-    public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerGradients);
-    public void PerformGradientDescent(GradientDescentAccumulator accumulator);
+    public void BackpropagateGradients(IPreviousLayerGradientDescentContainer accumulator);
+    public void PerformGradientDescent(IGradientDescentAccumulator accumulator);
 }
 
 public interface IOutputLayer : ILayer
@@ -46,6 +49,23 @@ public interface INode
     public List<Weight> InputWeights { get; }
 
 }
+
+public interface IGradientDescentAccumulator
+{
+    Dictionary<int, IEnumerable<IGradientDescentInput>> Gradients { get; }
+    double LeariningRate { get; }
+
+    void Add(ILayer layer, IEnumerable<IGradientDescentInput> gradientDescentInputs);
+}
+
+public interface IPreviousLayerGradientDescentContainer : IGradientDescentAccumulator
+{
+    List<IGradientDescentInput> PreviousLayerGradientDescent { get; }
+
+    void AddCurrentAsPreviousLayer(IGradientDescentInput[] gradientDescentInputs);
+    void AddCurrentAsPreviousLayer(List<IGradientDescentInput> gradientDescentInputs);
+}
+
 
 public class Weight
 {
@@ -388,8 +408,8 @@ public class InputLayer : ILayer, IGradientDescentEnabledLayer
 
     public Task BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient) => Task.CompletedTask;
 
-    public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerGradients) { } // No backpropagation on input layer
-    public void PerformGradientDescent(GradientDescentAccumulator accumulator) { } // No gradient descent on input layer
+    public void BackpropagateGradients(IPreviousLayerGradientDescentContainer accumulator) { } // No backpropagation on input layer
+    public void PerformGradientDescent(IGradientDescentAccumulator accumulator) { } // No gradient descent on input layer
 
     public string GetLayerName() => "InputLayer";
 }
@@ -448,7 +468,7 @@ public abstract class Layer : ILayer
 
     public abstract Task BackPropagate(IBackPropagationInput[] backPropagationInput, double gradient);
 
-    public void PerformGradientDescent(GradientDescentAccumulator accumulator)
+    public void PerformGradientDescent(IGradientDescentAccumulator accumulator)
     {
         foreach (var gradient in accumulator.Gradients[Id])
         {
@@ -468,12 +488,45 @@ public class HiddenLayer : Layer, IGradientDescentEnabledLayer
 {
     public HiddenLayer(ILayer inputLayer, int size, Strategies strategies) : base(inputLayer, size, strategies) { }
     public HiddenLayer(Neuron[] neurons, Strategies strategies, ILayer inputLayer, int id)  : base(neurons, strategies, inputLayer, id) { }
-    public override async Task BackPropagate(IBackPropagationInput[] gradients, double rate) 
+
+    public override async Task BackPropagate(IBackPropagationInput[] gradients, double rate)
+    {
+        if (Globals.DefaultParallelOptions.MaxDegreeOfParallelism != 1)
+        {
+            await CalculateBackPropagateUsingParallelism(gradients, rate);
+            return;
+        }
+
+        await CalculateBackPropagateUsingSequential(gradients, rate);
+    }
+
+    private async Task CalculateBackPropagateUsingSequential(IBackPropagationInput[] gradients, double rate)
+    {
+        var hiddenGradients = new List<Tuple<int, GradientAdjustment>>();
+        var neurons = this.Neurons;
+
+        for(int i = 0; i < neurons.Length; i++)
+        {
+            var neuron = neurons[i];
+
+            double error = neuron.OutputWeights.Select(k => gradients[k.LinksTo.Id].Value * k.Value).ToArray().Fast_Sum();
+
+            var hiddenGradient = new GradientAdjustment(neuron, error * strategies.ActivationStrategy.ComputeActivationDerivative(neuron.Value) * rate);
+            hiddenGradient.ComputeWeights();
+            hiddenGradients.Add(new Tuple<int, GradientAdjustment>(i, hiddenGradient));
+        };
+
+        await this.InputLayer.BackPropagate(hiddenGradients.OrderBy(t => t.Item1).Select(v => v.Item2).ToArray(), rate); // Ensure results are ordered, since gradients were calculated in parallel.
+    }
+
+    private async Task CalculateBackPropagateUsingParallelism(IBackPropagationInput[] gradients, double rate)
     {
         var hiddenGradients = new ConcurrentBag<Tuple<int, GradientAdjustment>>();
         var neurons = this.Neurons;
 
-        Parallel.ForEach(Enumerable.Range(0, neurons.Length), (i) =>    // Use the input length to create parallel tasks 
+        Parallel.ForEach(Enumerable.Range(0, neurons.Length),
+            Globals.DefaultParallelOptions
+            , (i) =>    // Use the input length to create parallel tasks 
         {
             var neuron = neurons[i];
 
@@ -487,23 +540,23 @@ public class HiddenLayer : Layer, IGradientDescentEnabledLayer
         await this.InputLayer.BackPropagate(hiddenGradients.OrderBy(t => t.Item1).Select(v => v.Item2).ToArray(), rate); // Ensure results are ordered, since gradients were calculated in parallel.
     }
 
-    public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerInput)
+    public void BackpropagateGradients(IPreviousLayerGradientDescentContainer accumulator)
     {
-        var previousLayerInputr = previousLayerInput;
+        var previousLayerInput = accumulator.PreviousLayerGradientDescent;
         var gradients = new IGradientDescentInput[this.Neurons.Length];
         foreach (var neuron in this.Neurons)
         {
             var errorSum = 0d;
             foreach (var outputWeight in neuron.OutputWeights)
             {
-                errorSum += outputWeight.Value * previousLayerInputr[outputWeight.LinksTo.Id].Value;
+                errorSum += outputWeight.Value * previousLayerInput[outputWeight.LinksTo.Id].Value;
             }
             gradients[neuron.Id] = new HiddenGradientDescentInput(neuron, errorSum * strategies.ActivationStrategy.ComputeActivationDerivative(neuron.Logit)).ComputeGradientDescentWeights();
         }
 
         accumulator.Add(this, gradients);
 
-        this.InputLayer.PerformGradientBackwardPass(accumulator, previousLayerInput);
+        this.InputLayer.PerformGradientBackwardPass(accumulator, gradients);
     }
 
     public override string GetLayerName() => "HiddenLayer";
@@ -533,18 +586,21 @@ public class OutputLayer : Layer, IOutputLayer, IGradientDescentEnabledLayer
                         .Index()
                         .Select((e) => new OutputErrorAdjustment(e.Item, trainingData.expectedOutput[e.Index])).ToArray());
 
-    public void BackpropagateGradients(GradientDescentAccumulator accumulator,IGradientDescentInput[] previousLayerInput)
+    public void BackpropagateGradients(IPreviousLayerGradientDescentContainer accumulator)
     {
-        var previousLayerInputr = previousLayerInput;
-        var gradients = this.Neurons
-                            .Select(n => new OutputGradientDescentAdjustment(n, previousLayerInputr[n.Id].Value)
-                                                .ComputeGradientDescentWeights())
-                            .OrderBy(n => n.Node.Id)
-                            .ToArray();
+        var previousLayerInput = accumulator.PreviousLayerGradientDescent;
+        var gradients = new IGradientDescentInput[this.Neurons.Length];
+        foreach (var neuron in this.Neurons)
+        {
+            gradients[neuron.Id] = new OutputGradientDescentAdjustment(neuron, previousLayerInput[neuron.Id].Value)
+                                            .ComputeGradientDescentWeights();
+        }
+
         accumulator.Add(this, gradients);
 
         this.InputLayer.PerformGradientBackwardPass(accumulator, gradients);
     }
+
     public override string GetLayerName() => "OutputLayer";
     public Task ComputeLoss(double[] expectedOutput) => Task.CompletedTask;
 }
@@ -570,7 +626,7 @@ public class SoftMaxOutputLayer : Layer, IOutputLayer
     {
         var gradientInputs = backPropagationInput.Cast<IGradientDescentInput>().ToArray();
         // Backpropagate
-        var accumulator = new GradientDescentAccumulator(this.strategies, rate); // Starts new Accumulator
+        var accumulator = new GradientDescentAccumulator(rate); // Starts new Accumulator
         accumulator.Add(this, gradientInputs);
 
         this.InputLayer.PerformGradientBackwardPass(accumulator, gradientInputs);
@@ -852,16 +908,29 @@ public class GradientAdjustment(Neuron Neuron, double Gradient) : IBackPropagati
 }
 
 
-public class GradientDescentAccumulator(Strategies strategies, double learningRate) : IDisposable
+public class GradientDescentAccumulator(double learningRate) : IDisposable, IGradientDescentAccumulator, IPreviousLayerGradientDescentContainer
 {
     public double LeariningRate => learningRate;
-    public Strategies Strategies => strategies;
 
-    public Dictionary<int, IGradientDescentInput[]> Gradients { get; internal set; } = new Dictionary<int, IGradientDescentInput[]>();
+    public Dictionary<int, IEnumerable<IGradientDescentInput>> Gradients { get; internal set; } = new Dictionary<int, IEnumerable<IGradientDescentInput>> ();
 
-    public void Add(ILayer layer, IGradientDescentInput[] gradientDescentInputs)
+    public List<IGradientDescentInput> PreviousLayerGradientDescent { get; internal set; } = new List<IGradientDescentInput>();
+
+    public void Add(ILayer layer, IEnumerable<IGradientDescentInput> gradientDescentInputs)
     {
         this.Gradients.Add(layer.Id, gradientDescentInputs);
+    }
+
+    public void AddCurrentAsPreviousLayer(IGradientDescentInput[] gradientDescentInputs)
+    {
+        PreviousLayerGradientDescent.Clear();
+        PreviousLayerGradientDescent.AddRange(gradientDescentInputs.AsSpan());
+    }
+
+    public void AddCurrentAsPreviousLayer(List<IGradientDescentInput> gradientDescentInputs)
+    {
+        PreviousLayerGradientDescent.Clear();
+        PreviousLayerGradientDescent.AddRange(CollectionsMarshal.AsSpan(gradientDescentInputs));
     }
 
     public void Dispose()

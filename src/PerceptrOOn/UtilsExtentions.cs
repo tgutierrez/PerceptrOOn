@@ -17,12 +17,22 @@ namespace PerceptrOOn
             return gradientDescentInput;
         }
 
-        public static ILayer PerformGradientBackwardPass(this ILayer layer, GradientDescentAccumulator accumulator, IGradientDescentInput[] inputs)
+        public static ILayer PerformGradientBackwardPass(this ILayer layer, IPreviousLayerGradientDescentContainer accumulator, IGradientDescentInput[] inputs)
         {
             if (layer is not IGradientDescentEnabledLayer)
                 throw new InvalidOperationException($"Layer {layer.GetType()} id:{layer.Id} does not supports gradient descent");
+            accumulator.AddCurrentAsPreviousLayer(inputs);
+            (layer as IGradientDescentEnabledLayer)!.BackpropagateGradients(accumulator);
 
-            (layer as IGradientDescentEnabledLayer)!.BackpropagateGradients(accumulator, inputs);
+            return layer;
+        }
+
+        public static ILayer PerformGradientBackwardPass(this ILayer layer, IPreviousLayerGradientDescentContainer accumulator, List<IGradientDescentInput> inputs)
+        {
+            if (layer is not IGradientDescentEnabledLayer)
+                throw new InvalidOperationException($"Layer {layer.GetType()} id:{layer.Id} does not supports gradient descent");
+            accumulator.AddCurrentAsPreviousLayer(inputs);
+            (layer as IGradientDescentEnabledLayer)!.BackpropagateGradients(accumulator);
 
             return layer;
         }

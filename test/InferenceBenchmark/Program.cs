@@ -46,12 +46,11 @@ public class InferenceBenchmark {
         return lastresult!; // Returns last result as recommended by BanchmarkDotNet
     }
 
-    [Benchmark]
-    public async Task<double[]> BenchamarkSimpleTraining() {
+    public async Task<double[]> BenchamarkSimpleTrainingUnlimitedParallelism() {
 
         var xorNetwork = new NeuralNetwork(new NetworkDefinition(
        InputNodes: 3,
-       HiddenLayerNodeDescription: [4],
+       HiddenLayerNodeDescription: [128, 64],
        OutputNodes: 2,
        Strategies: new Strategies(new ReLuActivationStrategy(0, x => 0.5, x => 0.5), new DefaultComputeStrategy()),
        UseSoftMaxOutput: true
@@ -64,7 +63,7 @@ public class InferenceBenchmark {
                         new TrainingData([1d, 0d, 1d], [0d, 1d]),
                         new TrainingData([0d, 1d, 0d], [1d, 0d]),
                 ],
-                Epochs: 10000,
+                Epochs: 100,
                 TrainingRate: 0.01
             );
 
@@ -73,5 +72,62 @@ public class InferenceBenchmark {
         return [0d, 0d, 0d];
     }
 
+    public async Task<double[]> BenchamarkSimpleTrainingProcessorCont()
+    {
+        Globals.DefaultParallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount };
+
+        var xorNetwork = new NeuralNetwork(new NetworkDefinition(
+       InputNodes: 3,
+       HiddenLayerNodeDescription: [128, 64],
+       OutputNodes: 2,
+       Strategies: new Strategies(new ReLuActivationStrategy(0, x => 0.5, x => 0.5), new DefaultComputeStrategy()),
+       UseSoftMaxOutput: true
+    ));
+
+        var trainingParameters = new TrainingParameters(
+                TrainingDataSet: [
+                    new TrainingData([0d, 0d, 1d], [1d, 0d]),
+                        new TrainingData([1d, 1d, 1d], [0d, 1d]),
+                        new TrainingData([1d, 0d, 1d], [0d, 1d]),
+                        new TrainingData([0d, 1d, 0d], [1d, 0d]),
+                ],
+                Epochs: 100,
+                TrainingRate: 0.01
+            );
+
+        await xorNetwork.Train(trainingParameters);
+
+        return [0d, 0d, 0d];
+    }
+
+
+    [Benchmark]
+    public async Task<double[]> BenchamarkSimpleTrainingNoParallelism()
+    {
+        Globals.DefaultParallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 1 };
+
+        var xorNetwork = new NeuralNetwork(new NetworkDefinition(
+       InputNodes: 3,
+       HiddenLayerNodeDescription: [128, 64],
+       OutputNodes: 2,
+       Strategies: new Strategies(new ReLuActivationStrategy(0, x => 0.5, x => 0.5), new DefaultComputeStrategy()),
+       UseSoftMaxOutput: true
+    ));
+
+        var trainingParameters = new TrainingParameters(
+                TrainingDataSet: [
+                    new TrainingData([0d, 0d, 1d], [1d, 0d]),
+                        new TrainingData([1d, 1d, 1d], [0d, 1d]),
+                        new TrainingData([1d, 0d, 1d], [0d, 1d]),
+                        new TrainingData([0d, 1d, 0d], [1d, 0d]),
+                ],
+                Epochs: 100,
+                TrainingRate: 0.01
+            );
+
+        await xorNetwork.Train(trainingParameters);
+
+        return [0d, 0d, 0d];
+    }
 
 }

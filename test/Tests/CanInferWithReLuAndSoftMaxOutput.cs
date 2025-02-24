@@ -12,10 +12,10 @@ namespace Tests
     {
         [Test]
         public async Task DoTest() {
-
+            Globals.DefaultParallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 1 };
             var xorNetwork = new NeuralNetwork(new NetworkDefinition(
                InputNodes: 3,
-               HiddenLayerNodeDescription: [4],
+               HiddenLayerNodeDescription: [128, 64],
                OutputNodes: 2,
                Strategies: new Strategies(new ReLuActivationStrategy(0, x => 0.5, x => 0.5), new DefaultComputeStrategy()),
                UseSoftMaxOutput: true
