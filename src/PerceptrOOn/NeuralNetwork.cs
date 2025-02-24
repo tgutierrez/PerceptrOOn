@@ -2,6 +2,7 @@
 
 using PerceptrOOn;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 
 public interface ILayer {
     
@@ -252,7 +253,6 @@ public class NeuralNetwork
         var hiddenDefinitions = HiddenLayer.ToList().Select(h => h.Neurons.Length).ToArray();
         bool hasSoftMaxOutput = (layers[^1] is SoftMaxOutputLayer);
         this.Definition = new NetworkDefinition(InputLayer.Size, hiddenDefinitions, this.OutputLayer.Size, strategies,null, hasSoftMaxOutput); // infer definition based on the layer structure
-        // TODO: Validate input
     }
 
     private ILayer[] BuildLayers(NetworkDefinition definition)
@@ -490,19 +490,18 @@ public class HiddenLayer : Layer, IGradientDescentEnabledLayer
     public void BackpropagateGradients(GradientDescentAccumulator accumulator, IGradientDescentInput[] previousLayerInput)
     {
         var previousLayerInputr = previousLayerInput;
-        var gradients = new List<IGradientDescentInput>();
+        var gradients = new IGradientDescentInput[this.Neurons.Length];
         foreach (var neuron in this.Neurons)
         {
             var errorSum = 0d;
             foreach (var outputWeight in neuron.OutputWeights)
             {
                 errorSum += outputWeight.Value * previousLayerInputr[outputWeight.LinksTo.Id].Value;
-                gradients.Add(new HiddenGradientDescentInput(neuron, errorSum * strategies.ActivationStrategy.ComputeActivation(neuron.Logit)).ComputeGradientDescentWeights());
             }
+            gradients[neuron.Id] = new HiddenGradientDescentInput(neuron, errorSum * strategies.ActivationStrategy.ComputeActivationDerivative(neuron.Logit)).ComputeGradientDescentWeights();
         }
 
-
-        accumulator.Add(this, gradients.ToArray());
+        accumulator.Add(this, gradients);
 
         this.InputLayer.PerformGradientBackwardPass(accumulator, previousLayerInput);
     }
