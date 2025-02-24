@@ -10,7 +10,7 @@ namespace PerceptrOOn
     {
         public readonly Func<IEnumerable<double>, double> GetSum;
 
-        public DefaultComputeStrategy(bool useFastSum = true) {
+        public DefaultComputeStrategy(bool useFastSum = false) {
             GetSum = useFastSum?
                                 (s) => s.Fast_Sum():
                                 (s) => s.Sum();
