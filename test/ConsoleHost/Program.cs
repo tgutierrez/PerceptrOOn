@@ -27,8 +27,8 @@ internal class Program
         var trainingDataSet = new List<TrainingData>();
 
 
-        var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
-        //var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // Uncomment to train full. Warning, 30 epochs, on a Ryzen7700 takes +/- 1-2m
+        //var labels = new byte[] { 0, 1, 2, 3 }; // Demo training with a subset of 4 labels
+        var labels = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }; // Uncomment to train full. Warning, 30 epochs, on a Ryzen7700 takes +/- 1-2m
 
         var cpuInfo = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString();
         var osInfo = System.Runtime.InteropServices.RuntimeInformation.OSDescription.ToString();
@@ -89,8 +89,8 @@ internal class Program
 
             var trainingParameters = new TrainingParameters(
                     TrainingDataSet: trainingDataSet.ToArray(),
-                    Epochs: 10,
-                    TrainingRate: 0.001
+                    Epochs: 30,
+                    TrainingRate: 0.0001
                 );
 
 
@@ -99,7 +99,8 @@ internal class Program
 
            mnistNetwork = new NeuralNetwork(new NetworkDefinition(
            InputNodes: 784,
-           HiddenLayerNodeDescription: [64],
+
+           HiddenLayerNodeDescription: [128],
            OutputNodes: labels.Length, // Size of the label set will dictate the length
            UseSoftMaxOutput: true,
            Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu
