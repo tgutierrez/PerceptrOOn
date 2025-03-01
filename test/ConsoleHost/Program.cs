@@ -90,7 +90,7 @@ internal class Program
             var trainingParameters = new TrainingParameters(
                     TrainingDataSet: trainingDataSet.ToArray(),
                     Epochs: 10,
-                    TrainingRate: 0.01
+                    TrainingRate: 0.001
                 );
 
 
@@ -100,7 +100,7 @@ internal class Program
            mnistNetwork = new NeuralNetwork(new NetworkDefinition(
            InputNodes: 784,
 
-           HiddenLayerNodeDescription: [128],
+           HiddenLayerNodeDescription: [64, 16],
            OutputNodes: labels.Length, // Size of the label set will dictate the length
            UseSoftMaxOutput: true,
            Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu
