@@ -337,7 +337,7 @@ public class NeuralNetwork
         {
             CumulativeLoss = 0;
             await TrainingEpoch(trainingParameters, epoch, trainingParameters.TrainingRate);
-            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Finished Training Epoch {epoch + 1}/{trainingParameters.Epochs} - Loss: {CumulativeLoss/trainingParameters.TrainingDataSet.Length}");
+            Definition.NotificationCallback?.Invoke(epoch, trainingParameters.TrainingDataSet.Length, $"Finished Training Epoch {epoch + 1}/{trainingParameters.Epochs} - Loss: {(CumulativeLoss/(double)trainingParameters.TrainingDataSet.Length)}");
         }      
     }
 
