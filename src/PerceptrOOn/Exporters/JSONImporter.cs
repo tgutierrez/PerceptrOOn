@@ -56,21 +56,21 @@ namespace PerceptrOOn.Exporters
         }
 
         private ILayer? CreateHiddenLayer(ExportableLayer deserializedLayer, ILayer previousLayer, Strategies strategies)
-            => new HiddenLayer(GetNeurons(deserializedLayer.Nodes, previousLayer, strategies), strategies, previousLayer, deserializedLayer.LayerId);
+            => new HiddenLayer(l => GetNeurons(deserializedLayer.Nodes, l, previousLayer, strategies), strategies, previousLayer, deserializedLayer.LayerId);
 
         private ILayer CreateOutputLayer(ExportableLayer deserializedLayer, ILayer previousLayer, Strategies strategies)
-            => new OutputLayer(GetNeurons(deserializedLayer.Nodes, previousLayer, strategies), strategies, previousLayer, deserializedLayer.LayerId);
+            => new OutputLayer(l => GetNeurons(deserializedLayer.Nodes, l, previousLayer, strategies), strategies, previousLayer, deserializedLayer.LayerId);
 
         private ILayer CreateInputLayer(ExportableLayer deserializedLayer)
-            => new InputLayer(GetInputs(deserializedLayer.Nodes));
+            => new InputLayer(l => GetInputs(deserializedLayer.Nodes, l));
 
-        private InputNode[] GetInputs(ExportableNode[] nodes)
-            => nodes.Select(p => new InputNode(p.NodeId)).ToArray();
+        private InputNode[] GetInputs(ExportableNode[] nodes, ILayer currentLayer)
+            => nodes.Select(p => new InputNode(p.NodeId, currentLayer)).ToArray();
 
-        private Neuron[] GetNeurons(ExportableNode[] nodes, ILayer previousLayer, Strategies activationStrategy)
-            => nodes.Select(n => CreateNeuron(previousLayer, activationStrategy, n)).ToArray();
+        private Neuron[] GetNeurons(ExportableNode[] nodes, ILayer currentLayer, ILayer previousLayer, Strategies activationStrategy)
+            => nodes.Select(n => CreateNeuron(currentLayer, previousLayer, activationStrategy, n)).ToArray();
 
-        private static Neuron CreateNeuron(ILayer previousLayer, Strategies strategies, ExportableNode exportableNode)
+        private static Neuron CreateNeuron(ILayer currentLayer, ILayer previousLayer, Strategies strategies, ExportableNode exportableNode)
         {
             var inputWeights = new List<Weight>();
             var outputWeights = new List<Weight>();
@@ -79,6 +79,7 @@ namespace PerceptrOOn.Exporters
                                                         outputWeights,
                                                         exportableNode.Bias ?? 0d,
                                                         previousLayer,
+                                                        currentLayer,
                                                         exportableNode.NodeId
                                                         );
             // wire up current weights

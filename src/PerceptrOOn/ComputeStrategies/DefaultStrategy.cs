@@ -38,7 +38,7 @@ namespace PerceptrOOn
 
         private void ComputeLayer(IActivationStrategy strategy, Layer layer)
         {
-            Parallel.ForEach(layer.Neurons, async (neuron) => { await neuron.ComputeValue(); });
+            Parallel.ForEach(layer.Neurons,Globals.DefaultParallelOptions, async (neuron) => { await neuron.ComputeValue(); });
         }
 
         private ComputeNodeOutput ComputeNeuron(IActivationStrategy strategy, Neuron neuron) {
@@ -51,6 +51,12 @@ namespace PerceptrOOn
             }
 
             var logit = sum + neuron.Bias;
+            // Kludge: If neuron is output, we don't want to activate it
+            if (neuron.NodeLayer is OutputLayer)
+            {
+                return new ComputeNodeOutput(logit, logit);
+            }
+
             var activated = strategy.ComputeActivation(logit);
             return new ComputeNodeOutput(activated, logit);
         }

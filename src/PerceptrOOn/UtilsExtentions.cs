@@ -37,7 +37,7 @@ namespace PerceptrOOn
             return layer;
         }
 
-        public static ILayer PerformGradientDescentWith(this ILayer layer, GradientDescentAccumulator accumulator)
+        public static ILayer PerformGradientDescentWith(this ILayer layer, IGradientDescentAccumulator accumulator)
         {
             if (layer is not IGradientDescentEnabledLayer)
                 throw new InvalidOperationException($"Layer {layer.GetType()} id:{layer.Id} does not supports gradient descent");
