@@ -166,7 +166,7 @@ public interface IBackPropagationInput {
 
 public interface IGradientDescentInput : IBackPropagationInput, IComparable // "Marker" interface for proper method assignment
 {
-    public List<Weight> WeightGradients { get; }
+    public Weight[] WeightGradients { get; }
     double BiasGradient { get; }
 }
 
@@ -832,15 +832,25 @@ public class OutputErrorAdjustment(Neuron Neuron, double ExpectedValue) : IBackP
     public double SampleLoss() => Value * Math.Log(Neuron.Value) + 1e-8; // Avoids Log(0)
 }
 
-public class HiddenGradientDescentInput(Neuron neuron, double gradient) : IGradientDescentInput
+public class HiddenGradientDescentInput : IGradientDescentInput
 {
+    private readonly Neuron neuron;
+    private readonly double gradient;
+
+    public HiddenGradientDescentInput(Neuron neuron, double gradient)
+    {
+        this.neuron = neuron;
+        this.gradient = gradient;
+        WeightGradients = new Weight[neuron.InputWeights.Count];
+    }
+
     public double Value => gradient;
 
     public INode Node => neuron;
 
     public double BiasGradient { get; private set; }
 
-    public List<Weight> WeightGradients { get; private set; } = new List<Weight>();
+    public Weight[] WeightGradients { get; private set; }
 
     public int CompareTo(object? obj)
     {
@@ -854,7 +864,7 @@ public class HiddenGradientDescentInput(Neuron neuron, double gradient) : IGradi
         foreach (var weight in neuron.InputWeights)
         {
             weight.SetGradient(gradient * weight.LinkedFrom.Value);
-            WeightGradients.Add(weight);
+            WeightGradients[weight.LinkedFrom.Id] = weight;
         }
     }
 
@@ -875,6 +885,7 @@ public class SoftMaxErrorAdjustment : IGradientDescentInput
         expectedValue = ExpectedValue;
         var error = neuron.Value - expectedValue;
         Value = error;
+        WeightGradients = new Weight[neuron.InputWeights.Count];
     }
 
     public INode Node => neuron;
@@ -897,21 +908,31 @@ public class SoftMaxErrorAdjustment : IGradientDescentInput
     {
         throw new NotSupportedException();
     }
-    public List<Weight> WeightGradients { get; private set; } = new List<Weight>();
+    public Weight[] WeightGradients { get; private set; }
 
     public double SampleLoss() => expectedValue * Math.Log(neuron.Value) + 1e-8; // Avoids Log(0)
 
 }
 
-public class OutputGradientDescentAdjustment(Neuron neuron, double gradient) : IGradientDescentInput
+public class OutputGradientDescentAdjustment : IGradientDescentInput
 {
-    public double Value { get; private set; } = gradient;   
+    private readonly Neuron neuron;
+    private readonly double gradient;
+    public OutputGradientDescentAdjustment(Neuron neuron, double gradient)
+    {
+        this.neuron = neuron;
+        this.gradient = gradient;   
+        this.Value = gradient;
+        WeightGradients = new Weight[neuron.InputWeights.Count];
+    }
+
+    public double Value { get; private set; }   
 
     public INode Node => neuron;
 
     public double BiasGradient {  get; private set; }
 
-    public List<Weight> WeightGradients { get; private set; } = new List<Weight>();
+    public Weight[] WeightGradients { get; private set; }
 
     public int CompareTo(object? obj)
     {
@@ -925,7 +946,7 @@ public class OutputGradientDescentAdjustment(Neuron neuron, double gradient) : I
         foreach (var weight in neuron.InputWeights)
         {
             weight.SetGradient(gradient * weight.LinkedFrom.Value);
-            WeightGradients.Add(weight);
+            WeightGradients[weight.LinkedFrom.Id] = weight;
         }
     }
 
