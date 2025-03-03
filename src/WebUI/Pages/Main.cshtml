@@ -1,0 +1,43 @@
+﻿@page "/"
+@model MainModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<div class="container-fluid">
+    <div class="row gx-5">
+        <div class="col-8">
+            <div class="border bg-light ratio ratio-1x1">
+                <div id="inputgrid"></div>
+            </div>
+        </div>
+        <div class="col-2">
+            <div id="output" class="row row-cols-1 gap-3">
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var inputgrid = null;
+    var outputgrid = null;
+    window.onload = function() {
+        inputgrid = new Grid(document.getElementById("inputgrid"));
+        inputgrid.Create(28, 28);
+
+        outputgrid = new OutputGrid(document.getElementById("output"));
+        outputgrid.Create(10);
+
+    }
+</script>
+
+<template id="result">
+    <div class="d-flex align-items-center gap-3">
+        <div class="badge text-bg-primary rounded-pill">1</div>
+            <div class="progress flex-grow-1 align-middle" role="progressbar" aria-label="X" aria-valuenow="54" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:76%"></div>
+            </div>
+    </div>
+</template>
+

@@ -259,6 +259,10 @@ public class NeuralNetwork
 
     public double CumulativeLoss {  get; internal set; }
 
+
+    public List<INode> Nodes { get; internal set; } = new();
+    public List<Weight> Weights { get; internal set; } = new();
+
     /// <summary>
     /// Builds the network using definitions
     /// </summary>
@@ -267,6 +271,7 @@ public class NeuralNetwork
         this.strategies = definition.Strategies;
         layers = BuildLayers(definition);
         this.Definition = definition;
+        CollectAllNodes();
     }
 
     /// <summary>
@@ -281,6 +286,7 @@ public class NeuralNetwork
         var hiddenDefinitions = HiddenLayer.ToList().Select(h => h.Neurons.Length).ToArray();
         bool hasSoftMaxOutput = (layers[^1] is SoftMaxOutputLayer);
         this.Definition = new NetworkDefinition(InputLayer.Size, hiddenDefinitions, this.OutputLayer.Size, strategies,null, hasSoftMaxOutput); // infer definition based on the layer structure
+        CollectAllNodes();
     }
 
     private ILayer[] BuildLayers(NetworkDefinition definition)
@@ -368,6 +374,22 @@ public class NeuralNetwork
 
 
     public T Export<T>(INetworkExporter<T> exporter) => exporter.Export(layers, strategies);
+
+
+    public void CollectAllNodes()
+    {
+        foreach (var layer in layers)
+        {
+            foreach (var node in layer.Content)
+            {
+                Nodes.Add(node);
+                foreach (var weight in node.OutputWeights)
+                {
+                    Weights.Add(weight);
+                }
+            }
+        }
+    }
 }
 
 /// <summary>
