@@ -42,6 +42,7 @@ const ActiveCell = function (grid, index, x, y) {
     this.brushRadius = 3;
     this.Value = 0;
     var element = document.createElement('div');
+    element.draggable = false;
     element.className = 'cell';
     grid.Container.appendChild(element);
     this.Cell = element;

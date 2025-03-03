@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace WebUI.Pages
+namespace Perceptr00n.WebUI.Pages
 {
     public class PrivacyModel : PageModel
     {
