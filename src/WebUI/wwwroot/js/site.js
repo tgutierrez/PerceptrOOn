@@ -12,12 +12,15 @@ const Grid = function (container) {
     this.Container = container;
     this.Cells = [];
     this.Display = [];
+    this.OnResultsFetched = null;
+    
 }
 
 Grid.prototype = {
-    Create(height, width) {
+    Create(height, width, callback) {
         this.Height = height;
         this.Width = width;
+        this.OnResultsFetched = callback;
         let index = 0;
         for (let y = 0; y < height; y++) {
             let row = [];
@@ -30,6 +33,23 @@ Grid.prototype = {
             }
             this.Display.push(row);
         }
+    },
+
+    SubmitEvent() {
+        var collectedInputs = this.Cells.map(cell => cell.Value);
+        fetch('/api/infer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(collectedInputs)
+        }).then(response => {
+            response
+                .json()
+                .then(data => {
+                    this.OnResultsFetched(data);
+                });
+        });
     }
 
 }
@@ -59,13 +79,11 @@ const ActiveCell = function (grid, index, x, y) {
 
     element.addEventListener('mouseup', (event) => {
         this.ApplyBrush({ event: event, action: CellEvent.DO_PAINT });
+        this.SubmitEvent();
     });
 }
 
 ActiveCell.prototype = {
-    Clear() {
-
-    },
     ApplyBrush(ev) {
         let minX = 0;
         let minY = 0;
@@ -106,12 +124,16 @@ ActiveCell.prototype = {
                 }
             }
         }
+    },
+    SubmitEvent() {
+        this.Grid.SubmitEvent();
     }
 }
 
 const OutputGrid = function (container) {
     this.Container = container;
     this.Cells = [];
+    var self = this;
 }
 
 OutputGrid.prototype = {
@@ -119,6 +141,12 @@ OutputGrid.prototype = {
         for (let i = 0; i < size; i++) {
             var displayCell = new ResultDisplay(this.Container, i);
             this.Cells.push(displayCell);
+        }
+    },
+    SetResults(results) {
+        console.log(results);
+        for (let i = 0; i < results.length; i++) {
+            this.Cells[i].SetValue(results[i]*100);
         }
     }
 }

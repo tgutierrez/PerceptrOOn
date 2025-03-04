@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Caching.Memory;
 using Perceptr00n.WebUI.App;
+using WebUI.App;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,11 @@ builder.Services
         options.Cookie.Name = "Infer-Session";
     });
 
+builder
+    .Services
+        .AddMemoryCache(o => o.SizeLimit = 4)
+        .AddSingleton<InferenceSessionHandler>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -28,7 +35,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+app.AddInferenceAPI();
 app.UseRouting();
 app.UseSession();
 
