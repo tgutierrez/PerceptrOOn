@@ -42,4 +42,6 @@ body {
 .cell {
     background: white;
     border: 0px;
+    user-select: none;
+    font-size:xx-small;
 }

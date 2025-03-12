@@ -13,7 +13,7 @@ const Grid = function (container) {
     this.Cells = [];
     this.Display = [];
     this.OnResultsFetched = null;
-    
+    this.BrushSize = 4;
 }
 
 Grid.prototype = {
@@ -59,10 +59,10 @@ const ActiveCell = function (grid, index, x, y) {
     this.Index = index;
     this.X = x;
     this.Y = y;
-    this.brushRadius = 3;
     this.Value = 0;
     var element = document.createElement('div');
     element.draggable = false;
+    element.innerHTML = index; // + '/' + this.Value;
     element.className = 'cell';
     grid.Container.appendChild(element);
     this.Cell = element;
@@ -80,6 +80,7 @@ const ActiveCell = function (grid, index, x, y) {
     element.addEventListener('mouseup', (event) => {
         this.ApplyBrush({ event: event, action: CellEvent.DO_PAINT });
         this.SubmitEvent();
+        
     });
 }
 
@@ -94,15 +95,22 @@ ActiveCell.prototype = {
             ev.action = CellEvent.DO_PAINT;
         }
 
-        for (let y = clamp(this.Y - this.brushRadius, minY, maxY); y <= clamp(this.Y + this.brushRadius, minY, maxY); y++) {
-            for (let x = clamp(this.X - this.brushRadius, minX, maxX); x <= clamp(this.X + this.brushRadius, minX, maxX); x++) {
-                const distance = Math.sqrt(Math.pow(this.Y - y, 2) + Math.pow(this.X - x, 2));
-                if (distance <= this.brushRadius) {
-                    const opacity = (1.0 - (distance / this.brushRadius));
+        let brushRadius = this.Grid.BrushSize;  
 
+        for (let y = clamp(this.Y - brushRadius, minY, maxY); y <= clamp(this.Y + brushRadius, minY, maxY); y++) {
+            for (let x = clamp(this.X - brushRadius, minX, maxX); x <= clamp(this.X + brushRadius, minX, maxX); x++) {
+                const distance = Math.sqrt(Math.pow(this.Y - y, 2) + Math.pow(this.X - x, 2));
+                if (distance <= brushRadius) {
+                    let opacity = Math.pow(1 - (distance / brushRadius), 2);
+
+                    x = Math.round(x);
+                    y = Math.round(y);
                     var currentCell = this.Grid.Display[y][x];
 
-
+                    if (opacity > 0.6)
+                        opacity = 1;
+                    if (opacity < 0.4)
+                        opacity = 0;
 
                     switch (ev.action) {
                         case CellEvent.CURSOR_IN:
@@ -114,10 +122,13 @@ ActiveCell.prototype = {
                             currentCell.Cell.style.backgroundColor = '';
                             break;
                         case CellEvent.DO_PAINT:
-                            let val = opacity * 255;
+                            let val = opacity;
                             if (currentCell.Value > val) break;
                             currentCell.Cell.style.backgroundColor = `rgba(0, 0, 0, ${opacity.toFixed(2)})`;
+                            //currentCell.Cell.style.backgroundColor = `rgba(0, 0, 0, 100%})`;
                             currentCell.Value = val;
+                            //currentCell.Cell.innerHTML = currentCell.Index + '/' + currentCell.Value.toFixed(2);
+                            
                             break;
                         default:
                     }

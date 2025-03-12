@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PublishAot>true</PublishAot>
+    <OptimizationPreference>Speed</OptimizationPreference>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
@@ -25,6 +26,7 @@
 
   <ItemGroup>
     <PackageReference Include="CircularBuffer" Version="1.4.0" />
+    <PackageReference Include="IdxFileLoader" Version="2.0.0" />
     <PackageReference Include="MNIST.IO" Version="1.0.1" />
     <PackageReference Include="Spectre.Console" Version="0.49.1" />
     <PackageReference Include="Spectre.Console.ImageSharp" Version="0.49.1" />
