@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Numerics;
-using System.Reflection.Emit;
-using System.Security.AccessControl;
+﻿using System.Numerics;
 
 namespace PerceptrOOn
 {
@@ -69,6 +66,17 @@ namespace PerceptrOOn
         }
 
         public static double Normalize(this byte input) => input / 255d;
+        public static double Normalize(this double input) => input / 255d;
+
+        public static double[] Normalize(this double[] input)
+        {
+            double[] normalized = new double[input.Length];
+            for (int i = 0; i < input.Length; i++)
+            {
+                normalized[i] = input[i].Normalize();
+            }
+            return normalized;
+        }
 
         public static void Apply<T>(this IEnumerable<T> items, Action<T> action)
         {
