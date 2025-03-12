@@ -3,6 +3,9 @@ using PerceptrOOn;
 using Perceptr00n.WebUI.App;
 using System.Text.Json;
 using System.Text;
+using System.Drawing;
+using System.Collections;
+using System.Reflection.Emit;
 
 namespace WebUI.App
 {
@@ -23,7 +26,7 @@ namespace WebUI.App
 
         public async Task<double[]> Infer(double[] input)
         {
-            return await _currentNetwork.Predict(input.Normalize());
+            return await _currentNetwork.Predict(input);
         }
 
     }
@@ -39,12 +42,43 @@ namespace WebUI.App
 
         private static async Task InferService(double[] values, HttpContext context, InferenceSessionHandler inferenceSessionHandler)
         {
+            for (int i = 0; i < values.Length; i++)
+            {
+                values[i] = values[i] switch
+                {
+                    > 0.46 => 1,
+                    _ => values[i]
+                };
+            }
+
+
             var results = await context.GetInferenceSession().Infer(values);
+#if DEBUG
+            LogImage(values);
+#endif
+            Directory.CreateDirectory("ImageLog");
+
+
 
             context.Response.ContentType = "application/json";
             await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(results)));
 
             return;
+        }
+
+        private static void LogImage(double[] values)
+        {
+            var bytePixels = values.Select(v => (byte)(v * 255)).ToArray();
+            Directory.CreateDirectory("Images");
+            var fileName = $"Images/{Guid.NewGuid()}.bmp";
+            unsafe
+            {
+                fixed (byte* ptr = bytePixels)
+                {
+                    var bmp = new Bitmap(28, 28, 28, System.Drawing.Imaging.PixelFormat.Format8bppIndexed, (IntPtr)ptr);
+                    bmp.Save(fileName);
+                }
+            }
         }
     }
 

@@ -54,7 +54,7 @@ AnsiConsole.Status()
         var mnistJSON = File.ReadAllText(@"Assets/mnist.json");
         var importer = new JSONImporter();
         var layers = importer.Import(mnistJSON);
-        mnistNetwork = new NeuralNetwork(layers, new Strategies(new SigmoidActivationStrategy(), new DefaultComputeStrategy()));
+        mnistNetwork = new NeuralNetwork(layers, new Strategies(new ReLuActivationStrategy(), new DefaultComputeStrategy()));
     });
 
 await AnsiConsole.Live(table)

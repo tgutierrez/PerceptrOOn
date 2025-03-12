@@ -15,6 +15,8 @@ using System.Runtime.InteropServices;
 using System.Threading.Channels;
 using SixLabors.ImageSharp.Processing;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using IdxFileLoader;
+using System.IO.Compression;
 
 internal class Program
 {
@@ -61,13 +63,30 @@ internal class Program
 
             List<TestCase?> data = new();
 
+            using var idxImageFile = await IdxImageFile.LoadAsync(
+                new GZipStream(File.OpenRead("./Assets/train-images-idx3-ubyte.gz"), CompressionMode.Decompress));
+                        using var idxLabelFile = await IdxLabelFile.LoadAsync(
+                new GZipStream(File.OpenRead("./Assets/train-labels-idx1-ubyte.gz"), CompressionMode.Decompress));
+
+
+            var preparingSet = ctx.AddTask("Loading Images from Training Set:", new ProgressTaskSettings { MaxValue = idxImageFile.ImageCount });
+            for (int i = 0; i < idxImageFile.ImageCount; i++)
+            {
+                var buffer = await idxImageFile.ReadImageBufferAsync();
+                var label = await idxLabelFile.ReadLabelAsync();
+
+                data.Add(new TestCase() { Image = buffer, Label = label });
+                preparingSet.Increment(1);
+            }
+
+
             /*
              Loads the MNIST Dataset ref https://git-disl.github.io/GTDLBench/datasets/mnist_datasets/
              */
-            data = FileReaderMNIST.LoadImagesAndLables(
-                 @"Assets/train-labels-idx1-ubyte.gz"
-                , @"Assets/train-images-idx3-ubyte.gz"
-            ).ToList();
+            //data = FileReaderMNIST.LoadImagesAndLables(
+            //     @"Assets/train-labels-idx1-ubyte.gz"
+            //    , @"Assets/train-images-idx3-ubyte.gz"
+            //).ToList();
 
             data = data.Where(z => labels.Any(l => l == z!.Label)).ToList();
 
@@ -81,7 +100,7 @@ internal class Program
             var loadingSet = ctx.AddTask("Converting Images into Training Set:", new ProgressTaskSettings { MaxValue = data.Count() });
             foreach (var node in data)
             {
-                trainingDataSet.Add(new TrainingDataPreservingOriginal<TestCase>(node!,node!.Image.Flatten2DMatrix(), node.Label.ByteToFlatOutput(labels.Length)));
+                trainingDataSet.Add(new TrainingDataPreservingOriginal<TestCase>(node!, node.Image.Flatten2DMatrix(), node.Label.ByteToFlatOutput(labels.Length)));
                 loadingSet.Increment(1);
             }
 
@@ -89,8 +108,8 @@ internal class Program
 
             var trainingParameters = new TrainingParameters(
                     TrainingDataSet: trainingDataSet.ToArray(),
-                    Epochs: 10,
-                    TrainingRate: 0.001
+                    Epochs: 20,
+                    TrainingRate: 0.01
                 );
 
 
@@ -100,7 +119,7 @@ internal class Program
            mnistNetwork = new NeuralNetwork(new NetworkDefinition(
            InputNodes: 784,
 
-           HiddenLayerNodeDescription: [64, 16],
+           HiddenLayerNodeDescription: [800, 100],
            OutputNodes: labels.Length, // Size of the label set will dictate the length
            UseSoftMaxOutput: true,
            Strategies: new Strategies(new ReLuActivationStrategy(   // ReLu
@@ -120,7 +139,7 @@ internal class Program
 
             AnsiConsole.WriteLine("Writing Weights.");
 
-            File.WriteAllText("weights.json", mnistNetwork.ExportWith<JSONExporter, string>());
+            File.WriteAllText("mnist.json", mnistNetwork.ExportWith<JSONExporter, string>());
             mainTask.Increment(1);
 
 
@@ -279,5 +298,29 @@ internal class Program
 
         await mnistNetwork.Train(trainingParameters);
     }
+
+
+    public static byte[,] RotateMatrix(byte[,] matrix)
+    {
+        int n = matrix.GetLength(0);
+        // Ensure the matrix is square
+        if (n != matrix.GetLength(1))
+        {
+            throw new ArgumentException("Matrix must be square.");
+        }
+
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = i + 1; j < n; j++)
+            {
+                byte temp = matrix[i, j];
+                matrix[i, j] = matrix[j, i];
+                matrix[j, i] = temp;
+            }
+        }
+
+        return matrix;
+    }
+
 
 }
