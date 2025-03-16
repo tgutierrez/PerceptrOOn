@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 using Perceptr00n.WebUI.App;
+using Serilog;
 using WebUI.App;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 
+builder.Host.UseSerilog((hostingContext, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .ReadFrom.Configuration(hostingContext.Configuration)
+        .MinimumLevel.Debug()
+        .Enrich.FromLogContext()
+        .WriteTo.Console();
+});
 
 builder.Services.AddDistributedMemoryCache();
 
